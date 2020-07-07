@@ -2,6 +2,7 @@ from abc import ABCMeta
 from replayer.system_call_runners import SystemCallRunner
 from replayer.system_call_runners.regular_system_call_runner.regular_system_call_definition import \
     RegularSystemCallDefinition, REGULAR_SYSTEM_CALL_DEFINITIONS
+from .fs_system_call_definitions import *
 
 
 class RegularSystemCallRunnerMetaclass(ABCMeta):

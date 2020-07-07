@@ -44,3 +44,43 @@ def test_replayer_fails_gracefully_with_no_sys_calls(run_system_calls_on_binary)
                                    arguments_for_binary=['5', '5', b"ddd"],
                                    system_call_numbers_to_handle=[0],
                                    system_calls=[])
+
+
+def test_replayer_read_with_multiple_copies(run_system_calls_on_binary):
+    buffer = b"hello my good lady"
+    buffer_addr = 1111
+    length = len(buffer)
+    fd = -1
+
+    run_system_calls_on_binary(binary_name='read',
+                               arguments_for_binary=[str(length), str(length), buffer],
+                               system_call_numbers_to_handle=[0],
+                               system_calls=[
+                                   SystemCall(
+                                       registers=dict(
+                                           orig_ax=0,
+                                           rdi=fd,
+                                           rsi=buffer_addr,
+                                           rdx=length
+                                       ),
+                                       memory_copies=[
+                                           MemoryCopy(
+                                               from_address=0,
+                                               to_address=buffer_addr,
+                                               buffer=buffer[:7]
+                                           ),
+                                           MemoryCopy(
+                                               from_address=4444,
+                                               to_address=buffer_addr + 7,
+                                               buffer=buffer[7:10]
+                                           ),
+                                           MemoryCopy(
+                                               from_address=2222,
+                                               to_address=buffer_addr + 10,
+                                               buffer=buffer[10:]
+                                           )
+                                       ],
+                                       return_value=length
+                                   )
+                               ]
+                               )

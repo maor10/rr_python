@@ -13,7 +13,8 @@ class Replayer:
         self.pid = pid
         self.system_calls = system_calls
 
-    def has_supported_syscall_runner_for_system_call(self, sys_call_number):
+    @staticmethod
+    def has_supported_syscall_runner_for_system_call(sys_call_number):
         return sys_call_number in SystemCallRunner.SYSTEM_CALL_NUMBERS_TO_SYSTEM_CALL_RUNNERS
 
     def system_call_handler(self, sys_call_number: int = None, *registers):

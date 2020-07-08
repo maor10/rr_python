@@ -158,31 +158,29 @@ PyObject* replay() {
  * 
  * Converts buffer to words and copies them into tracee's memory at givven addr
  **/
-void write_buffer_to_tracee(int child, long addr, char *buffer, int length) {   
+PyObject* write_buffer_to_tracee(long addr, char *buffer, int length) {   
   const int word_size = sizeof(long);
-  int size_to_copy = word_size;
-  char *current_address;
-  int i;
-  int loops_needed;
-  int has_leftover;
-  int leftover;
+  int length_left = length;
+
   union char_word_u {
           long val;
           char chars[word_size];
   } data;
 
-  leftover = length % word_size; 
-  has_leftover = leftover != 0; 
-  loops_needed = has_leftover ? (length / word_size) + 1 : length / word_size;
-  current_address = buffer;
-  for (i = 0; i < loops_needed; i++) {
-    if (has_leftover && (i == (loops_needed - 1))) {
-      size_to_copy = leftover;
-    }
-    memcpy(data.chars, current_address, size_to_copy);
-    ptrace(PTRACE_POKEDATA, child, addr + i * word_size, data.val);
-    current_address += size_to_copy;
+  while (length_left >= word_size) {
+    memcpy(data.chars, buffer + (length - length_left), word_size);
+    RAISE_EXCEPTION_WITH_ERRNO_ON_TRUE(ptrace(PTRACE_POKEDATA, pid_to_ptrace, addr + (length - length_left), data.val) == -1);
+    length_left -= word_size;
   }
+
+  if (length_left > 0) {
+    data.val = ptrace(PTRACE_PEEKTEXT, pid_to_ptrace, addr + (length - length_left), 0);
+    RAISE_EXCEPTION_WITH_ERRNO_ON_TRUE(data.val == -1);
+    memcpy(data.chars, buffer + (length - length_left), length_left);
+    RAISE_EXCEPTION_WITH_ERRNO_ON_TRUE(ptrace(PTRACE_POKEDATA, pid_to_ptrace, addr + (length - length_left), data.val));
+  }
+
+  Py_RETURN_NONE;
 }
 
 
@@ -202,7 +200,7 @@ static PyObject* set_memory_in_replayed_process(PyObject *self, PyObject *args) 
   long length;
 
   RETURN_NULL_ON_TRUE(!PyArg_ParseTuple(args, "Ks#", &address, &buffer, &length));
-  write_buffer_to_tracee(pid_to_ptrace, address, buffer, length);
+  RETURN_NULL_ON_TRUE(write_buffer_to_tracee(address, buffer, length) == NULL);
 
   return Py_BuildValue("");
 } 

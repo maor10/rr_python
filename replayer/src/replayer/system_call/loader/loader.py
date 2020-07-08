@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, List, Generator
 
 from replayer.system_call import SystemCall
 from replayer.system_call.loader.consts import REGISTER_NAMES_IN_PROTOCOL_ORDER
@@ -55,5 +55,5 @@ class Loader:
         while self.binary_unpacker.has_more_bytes():
             yield self.load_system_call()
 
-    def load_system_calls(self):
+    def load_system_calls(self) -> List[SystemCall]:
         return list(self.load_system_calls_generator())

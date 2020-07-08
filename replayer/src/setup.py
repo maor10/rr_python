@@ -12,4 +12,4 @@ setup(name='replayer',
       version='1.0',
       packages=find_packages(),
       ext_modules=[module]
-)
+      )

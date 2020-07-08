@@ -160,24 +160,25 @@ PyObject* replay() {
  **/
 PyObject* write_buffer_to_tracee(long addr, char *buffer, int length) {   
   const int word_size = sizeof(long);
-  int length_left = length;
 
   union char_word_u {
           long val;
           char chars[word_size];
   } data;
 
-  while (length_left >= word_size) {
-    memcpy(data.chars, buffer + (length - length_left), word_size);
-    RAISE_EXCEPTION_WITH_ERRNO_ON_TRUE(ptrace(PTRACE_POKEDATA, pid_to_ptrace, addr + (length - length_left), data.val) == -1);
-    length_left -= word_size;
+  while (length >= word_size) {
+    memcpy(data.chars, buffer, word_size);
+    RAISE_EXCEPTION_WITH_ERRNO_ON_TRUE(ptrace(PTRACE_POKEDATA, pid_to_ptrace, addr, data.val) == -1);
+    length -= word_size;
+    buffer += word_size;
+    addr += word_size;
   }
 
-  if (length_left > 0) {
-    data.val = ptrace(PTRACE_PEEKTEXT, pid_to_ptrace, addr + (length - length_left), 0);
+  if (length > 0) {
+    data.val = ptrace(PTRACE_PEEKTEXT, pid_to_ptrace, addr, 0);
     RAISE_EXCEPTION_WITH_ERRNO_ON_TRUE(data.val == -1);
-    memcpy(data.chars, buffer + (length - length_left), length_left);
-    RAISE_EXCEPTION_WITH_ERRNO_ON_TRUE(ptrace(PTRACE_POKEDATA, pid_to_ptrace, addr + (length - length_left), data.val));
+    memcpy(data.chars, buffer, length);
+    RAISE_EXCEPTION_WITH_ERRNO_ON_TRUE(ptrace(PTRACE_POKEDATA, pid_to_ptrace, addr, data.val));
   }
 
   Py_RETURN_NONE;

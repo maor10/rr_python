@@ -1,6 +1,6 @@
 from typing import List
 import creplayer
-from replayer.consts import REGISTER_NAMES
+from replayer.consts import REGISTER_NAMES, SYS_CALL_REGISTER
 from replayer.exceptions import NoSuchSysCallRunnerExistsException
 from replayer.system_call import SystemCall
 from replayer.system_call.loader.loader import Loader
@@ -12,6 +12,12 @@ class Replayer:
     def __init__(self, pid: int, system_calls: List[SystemCall]):
         self.pid = pid
         self.system_calls = system_calls
+
+    @classmethod
+    def from_pid_and_system_calls(cls, pid: int, system_calls: List[SystemCall]):
+        system_calls = [system_call for system_call in system_calls
+                        if cls.has_supported_syscall_runner_for_system_call(system_call.registers[SYS_CALL_REGISTER])]
+        return cls(pid, system_calls)
 
     @staticmethod
     def has_supported_syscall_runner_for_system_call(sys_call_number):
@@ -48,9 +54,9 @@ def run_replayer(pid: int, system_calls: List[SystemCall]):
     :param pid: to run on
     :param system_calls: to give back to process
     """
-    Replayer(pid, system_calls).start_replaying()
+    Replayer.from_pid_and_system_calls(pid, system_calls).start_replaying()
 
 
 def run_replayer_on_records_at_path(pid: int, path: str):
     system_calls = Loader.from_path(path).load_system_calls()
-    Replayer(pid, system_calls).start_replaying()
+    Replayer.from_pid_and_system_calls(pid, system_calls).start_replaying()

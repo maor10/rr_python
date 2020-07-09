@@ -14,3 +14,6 @@ REGISTER_NAMES = ['rax',
                   'r13',
                   'r14',
                   'r15']
+
+
+SYS_CALL_REGISTER = 'orig_ax'

@@ -132,7 +132,6 @@ ssize_t dump_single_record(char __user *buf, size_t size) {
     free_syscall_record(syscall_record);
     return len;
 cleanup_short_write:
-    free_syscall_record(syscall_record);
     return -SHORT_WRITE_ERROR;
 cleanup:
     free_syscall_record(syscall_record);

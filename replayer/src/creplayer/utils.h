@@ -26,8 +26,10 @@
   Py_RETURN_NONE;   \
 }
 
-#define LOG(...) printf(__VA_ARGS__);  \
-  printf("\n");
+/** #define LOG(...) printf(__VA_ARGS__);  \
+   printf("\n");
+**/
 
+#define LOG(...) ;
 
 #endif

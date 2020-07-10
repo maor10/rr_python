@@ -4,7 +4,9 @@
 
 #include "syscall_wrapper.h"
 #include "copy_to_user_wrapper.h"
+#include "recorded_processes_loader.h"
 #include "utils.h"
+
 
 // TODO -- is 1 << 15 Too big???
 // Maybe we should just save pointer to heap in kfifo?
@@ -68,12 +70,14 @@ int pre_syscall(struct kretprobe_instance * probe, struct pt_regs *regs) {
     IF_TRUE_CLEANUP(__NR_execve == regs->di || __NR_exit == regs->di || __NR_exit_group == regs->di);
     
 	// TODO: RECORD ONLY SPECIFIC PROCESSES
-	IF_TRUE_CLEANUP(0 != strcmp(current->comm, "python"));
+	IF_TRUE_CLEANUP(current->pid != recorded_process_pid || recorded_process_pid == 0);
     IF_TRUE_CLEANUP(NULL != current_syscall_record, "Multiple syscall recording the same time not supported yet");
     
     current_syscall_record = kmalloc(sizeof(struct syscall_record), GFP_KERNEL);
     IF_TRUE_CLEANUP(NULL == current_syscall_record, "Failed to alloc syscall record!");
 
+    LOG("Syscall %d", regs->di);
+    
     // Init current syscall record
     current_syscall_record->amount_of_copies = 0;
     INIT_LIST_HEAD(&(current_syscall_record->copies_to_user));

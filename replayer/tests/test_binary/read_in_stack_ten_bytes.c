@@ -21,7 +21,7 @@ int main(int argc, char *argv[]) {
   char *expected_buffer = argv[3];
   int fd = -1;
 
-  char buffer[5];
+  char buffer[10];
 
   ssize_t size;
 

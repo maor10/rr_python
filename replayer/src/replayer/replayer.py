@@ -1,6 +1,6 @@
 from typing import List
 import creplayer
-from replayer.consts import REGISTER_NAMES, SYS_CALL_REGISTER
+from replayer.consts import REGISTER_NAMES, SYS_CALL_REGISTER, SYS_CALL_NAMES
 from replayer.exceptions import NoSuchSysCallRunnerExistsException
 from replayer.system_call import SystemCall
 from replayer.system_call.loader.loader import Loader
@@ -21,7 +21,8 @@ class Replayer:
 
     @staticmethod
     def has_supported_syscall_runner_for_system_call(sys_call_number):
-        return sys_call_number in SystemCallRunner.SYSTEM_CALL_NUMBERS_TO_SYSTEM_CALL_RUNNERS
+        will_run = sys_call_number in SystemCallRunner.SYSTEM_CALL_NUMBERS_TO_SYSTEM_CALL_RUNNERS
+        return will_run
 
     def system_call_handler(self, sys_call_number: int = None, *registers):
         if len(self.system_calls) == 0:

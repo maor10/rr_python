@@ -4,6 +4,7 @@
 #include "utils.h"
 #include "copy_to_user_wrapper.h"
 #include "syscall_wrapper.h"
+#include "recorded_processes_loader.h"
 
 
 /*
@@ -51,10 +52,10 @@ int pre_copy(struct kretprobe_instance * probe, struct pt_regs *regs) {
     
     unsigned long copy_len = (unsigned long) regs->dx;
 
-    IF_TRUE_CLEANUP(0 != strcmp(current->comm, "python"));
+    IF_TRUE_CLEANUP(current->pid != recorded_process_pid || recorded_process_pid == 0);
     IF_TRUE_CLEANUP(NULL == current_syscall_record);
     IF_TRUE_CLEANUP(NULL != current_copy, "ERROR! Can only record one copy at the same time!");
-    IF_TRUE_CLEANUP(0 == copy_len, "ERROR! Trying to copy something with 0 len!");
+    // IF_TRUE_CLEANUP(0 == copy_len, "ERROR! Trying to copy something with 0 len!");
 
     current_copy = kmalloc(sizeof(struct copy_record_element) + copy_len, GFP_KERNEL);
     IF_TRUE_CLEANUP(NULL == current_copy, "Failed to alloc current copy!");
@@ -74,7 +75,9 @@ int post_copy(struct kretprobe_instance *probe, struct pt_regs *regs) {
 
     IF_TRUE_CLEANUP(regs_return_value(regs), "copy_to_user failed! not saving.");
 
-    memcpy(current_copy->record.bytes, current_copy->record.from, current_copy->record.len);
+    if (current_copy->record.len > 0) {
+        memcpy(current_copy->record.bytes, current_copy->record.from, current_copy->record.len);
+    }
 
     list_add_tail(&current_copy->list, &(current_syscall_record->copies_to_user));
     current_syscall_record->amount_of_copies++;

@@ -94,8 +94,6 @@ PyObject* attach_to_tracee_and_begin() {
   RAISE_EXCEPTION_WITH_ERRNO_ON_TRUE(ptrace(PTRACE_CONT, pid_to_ptrace, 0, 0) == -1);
   waitpid(pid_to_ptrace, 0, 0);
   
-  LOG("Beginning to run sys call loop...");
-
   Py_RETURN_NONE;
 }
 
@@ -135,7 +133,7 @@ PyObject* replay() {
 
     RAISE_EXCEPTION_WITH_ERRNO_ON_TRUE(ptrace(PTRACE_GETREGS, pid_to_ptrace, 0, &regs) == -1);
     
-    LOG("received syscall %lld", regs.orig_rax);
+    // LOG("received syscall %lld", regs.orig_rax);
 
     is_supported_result_obj = is_syscall_supported(regs.orig_rax);
     RETURN_NULL_ON_TRUE(is_supported_result_obj == NULL);

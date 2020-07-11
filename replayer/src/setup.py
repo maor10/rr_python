@@ -11,5 +11,6 @@ module = Extension("creplayer", sources=list(map(str, BASE_C_INTERCEPTOR_DIRECTO
 setup(name='replayer',
       version='1.0',
       packages=find_packages(),
-      ext_modules=[module]
+      ext_modules=[module],
+      install_requires=['interruptingcow']
       )

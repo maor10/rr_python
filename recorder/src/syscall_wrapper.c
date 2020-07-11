@@ -76,8 +76,6 @@ int pre_syscall(struct kretprobe_instance * probe, struct pt_regs *regs) {
     current_syscall_record = kmalloc(sizeof(struct syscall_record), GFP_KERNEL);
     IF_TRUE_CLEANUP(NULL == current_syscall_record, "Failed to alloc syscall record!");
 
-    LOG("Syscall %d", regs->di);
-    
     // Init current syscall record
     current_syscall_record->amount_of_copies = 0;
     INIT_LIST_HEAD(&(current_syscall_record->copies_to_user));

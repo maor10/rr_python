@@ -6,12 +6,12 @@ extern int recorded_process_pid;
 
 
 /*
- * @purpose: Create the proc file to dump records.
+ * @purpose: Create the proc file to load recorded processes
  */
 int init_recorded_processes_loader(void);
 
 /*
- * @purpose: Destroy the proc file to dump records
+ * @purpose: Destroy the proc file to load recorded processes
  */
 void remove_recorded_processes_loader(void);
 

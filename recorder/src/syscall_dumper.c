@@ -142,7 +142,6 @@ ssize_t dump_records(char __user *buf, size_t size) {
     ssize_t size_written = 0;
     ssize_t dump_ret;
     int did_do_first_write = 0;
-    LOG("Dumping records");
     do {
         dump_ret = dump_single_record(buf, size);
         switch (dump_ret)

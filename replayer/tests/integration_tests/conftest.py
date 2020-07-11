@@ -47,12 +47,14 @@ def dumper_context_manager(records_path):
     @contextlib.contextmanager
     def dumper():
         process = subprocess.Popen(["dd", "if=/proc/syscall_dumper", "bs=30M", f"of={str(records_path)}"])
-        yield
-        # let dumper finish...
-        time.sleep(0.3)
-        print("killing dumper")
-        if process.poll() is None:
-            process.kill()
+        try:
+            yield
+        finally:
+            # let dumper finish...
+            time.sleep(0.3)
+            print("killing dumper")
+            if process.poll() is None:
+                process.kill()
     return dumper
 
 
@@ -63,9 +65,11 @@ def recorder_context_manager():
         if REPLAY_SERVER_PROC_PATH.exists():
             REPLAY_SERVER_PROC_PATH.unlink()
         os.system(f"sudo insmod {KERNEL_MODULE_DIRECTORY}/record.ko")
-        yield
-        print("removing recordmod")
-        os.system(f"sudo rmmod record")
+        try:
+            yield
+        finally:
+            print("removing recordmod")
+            os.system(f"sudo rmmod record")
     return recorder
 
 
@@ -75,8 +79,10 @@ def replaying_context_manager():
     def replayer():
         with open(str(REPLAY_SERVER_PROC_PATH), 'wb') as f:
             f.write(b'1')
-        yield
-        if REPLAY_SERVER_PROC_PATH.exists():
-            REPLAY_SERVER_PROC_PATH.unlink()
+        try:
+            yield
+        finally:
+            if REPLAY_SERVER_PROC_PATH.exists():
+                REPLAY_SERVER_PROC_PATH.unlink()
     return replayer
 

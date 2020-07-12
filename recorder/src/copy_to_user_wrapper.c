@@ -38,13 +38,25 @@ struct kretprobe copyin_kretprobe = {
 	.kp.symbol_name	= "copyout",
 	.entry_handler 	= pre_copy,
 	.handler		= post_copy,
-	.maxactive		= 1000
+	.maxactive		= 1000,
+    .data_size      = sizeof(struct copy_record_element *)
 };
 
 struct copy_record_element * current_copy = NULL;
 
 void free_copy_record(struct copy_record_element * copy_record) {
     kfree(copy_record);
+}
+
+int get_current_syscall() {
+    struct syscall_record * syscall;
+
+    mutex_lock(&current_syscalls_mutex);
+    list_for_each_entry(&syscall, &current_syscalls, current_syscalls) {
+        if (current->pid == syscall->pid) {
+            return syscall;
+        }
+    }
 }
 
 int pre_copy(struct kretprobe_instance * probe, struct pt_regs *regs) {

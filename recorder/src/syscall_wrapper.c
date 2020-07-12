@@ -32,9 +32,8 @@ int pre_syscall(struct kretprobe_instance * probe, struct pt_regs *regs);
  */
 int post_syscall(struct kretprobe_instance *probe, struct pt_regs *regs);
 
-
-// TODO -- what if multiple processes start syscall?
-struct syscall_record *current_syscall_record;
+DEFINE_MUTEX(current_syscalls_mutex);
+LIST_HEAD(current_syscalls);
 
 DEFINE_MUTEX(recorded_syscalls_mutex);
 struct kfifo recorded_syscalls;
@@ -45,7 +44,9 @@ struct kretprobe syscall_kretprobe = {
 	.entry_handler 	= pre_syscall,
 	.handler		= post_syscall,
 	// TODO: Understand why after execve check still need maxactive...
-	.maxactive		= 1000
+	.maxactive		= 1000,
+    .data_size = sizeof(struct syscall_record *)
+
 };
 
 void free_syscall_record(struct syscall_record *syscall_record)
@@ -63,23 +64,31 @@ void free_syscall_record(struct syscall_record *syscall_record)
 int pre_syscall(struct kretprobe_instance * probe, struct pt_regs *regs) {
 
     struct pt_regs * userspace_regs_ptr = (struct pt_regs *) regs->si;
+    struct syscall_record * current_syscall;
 
     // We don't want to hook the return of execve \ exit because they never return :)
     IF_TRUE_CLEANUP(__NR_execve == regs->di || __NR_exit == regs->di || __NR_exit_group == regs->di);
     
 	// TODO: RECORD ONLY SPECIFIC PROCESSES
 	IF_TRUE_CLEANUP(0 != strcmp(current->comm, "python"));
-    IF_TRUE_CLEANUP(NULL != current_syscall_record, "Multiple syscall recording the same time not supported yet");
     
-    current_syscall_record = kmalloc(sizeof(struct syscall_record), GFP_KERNEL);
-    IF_TRUE_CLEANUP(NULL == current_syscall_record, "Failed to alloc syscall record!");
+    current_syscall = kmalloc(sizeof(struct syscall_record), GFP_KERNEL);
+    IF_TRUE_CLEANUP(NULL == current_syscall, "Failed to alloc syscall record!");
 
     // Init current syscall record
-    current_syscall_record->amount_of_copies = 0;
-    INIT_LIST_HEAD(&(current_syscall_record->copies_to_user));
+    current_syscall->amount_of_copies = 0;
+    INIT_LIST_HEAD(&(current_syscall->copies_to_user));
 
-    memcpy(&(current_syscall_record->userspace_regs), userspace_regs_ptr, sizeof(struct pt_regs));
-    current_syscall_record->userspace_regs_ptr = userspace_regs_ptr;
+    memcpy(&(current_syscall->userspace_regs), userspace_regs_ptr, sizeof(struct pt_regs));
+    current_syscall->userspace_regs_ptr = userspace_regs_ptr;
+    current_syscall->pid = current->pid;
+    
+    // TODO CHANGE TO RCU LOCK!
+    mutex_lock(&current_syscalls_mutex);
+    list_add(&current_syscall->current_syscalls, current_syscalls);
+    mutex_unlock(&current_syscalls_mutex);
+
+    memcpy(probe->data, current_syscall, sizeof(struct syscall_record * ));
 
 	return 0;
 
@@ -89,28 +98,30 @@ cleanup:
 
 int post_syscall(struct kretprobe_instance *probe, struct pt_regs *regs) {
 
-    IF_TRUE_CLEANUP(NULL == current_syscall_record, "Current syscall not defined!");
+    struct syscall_record * current_syscall;
+    unsigned int kfifo_ret;
 
-    current_syscall_record->ret = current_syscall_record->userspace_regs_ptr->ax;
+    memcpy(current_syscall, probe->data, sizeof(struct syscall_record *));
+
+    current_syscall->ret = current_syscall->userspace_regs_ptr->ax;
 
     mutex_lock(&recorded_syscalls_mutex);
-
-    if (sizeof(void *) == kfifo_in(&recorded_syscalls, &current_syscall_record, sizeof(void *))) {
-        wake_up(&recorded_syscalls_wait);
-        goto cleanup_mutex;
-    }    
-
-    printk("Failed to insert syscall to kfifo!");
-
-    // TODO THIS SHOULD NOT BE WITH MUTEX
-    // If we didn't put the object in kfifo we want to free it...
-    free_syscall_record(current_syscall_record);
-
-cleanup_mutex:
+    kfifo_ret = kfifo_in(&recorded_syscalls, &current_syscall, sizeof(void *));
     mutex_unlock(&recorded_syscalls_mutex);
 
+    IF_TRUE_GOTO(sizeof(void *) == kfifo_ret, free_syscall, "Failed to insert to kfifo!");
+    wake_up(&recorded_syscalls_wait);
+
+    goto cleanup;
+
+free_syscall:
+    free_syscall_record(current_syscall);
+
 cleanup:
-    current_syscall_record = NULL;
+    mutex_lock(&current_syscalls_mutex);
+    list_del(&current_syscall->current_syscalls);
+    mutex_unlock(&current_syscalls_mutex);
+
 	return 0;
 }
 

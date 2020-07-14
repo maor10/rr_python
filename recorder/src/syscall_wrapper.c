@@ -99,14 +99,12 @@ int post_wrap_syscall(struct kretprobe_instance * probe, struct pt_regs *regs) {
         "Failed to copy new mem from user!"
     );
 
-    printk("LEN: %d\n", recorded_mem->len);
     for (i = 0;i < recorded_mem->len; i++) {
         if (recorded_mem->mem[i] != new_mem[i]) {
             current_copy = kmalloc(sizeof(struct copy_record_element) + 1, GFP_KERNEL);
             // TODO TODO TODO WHAT IF KMALLOC FAILS!!!!
             current_copy->record.from = (void *) NULL;
             current_copy->record.to = recorded_mem->ptr + i;
-            printk("DATA: %x\n", new_mem[i]);
             current_copy->record.len = 1;
             memcpy(current_copy->record.bytes, new_mem + i, 1);
             list_add_tail(&current_copy->list, &(current_syscall_record->copies_to_user));

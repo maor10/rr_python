@@ -2,7 +2,7 @@
 #include <asm/unistd.h>
 #include <linux/mutex.h>
 
-#include "syscall_wrapper.h"
+#include "syscall_hooker.h"
 #include "copy_to_user_wrapper.h"
 #include "recorded_processes_loader.h"
 #include "utils.h"
@@ -69,6 +69,10 @@ int pre_syscall(struct kretprobe_instance * probe, struct pt_regs *regs) {
     // We don't want to hook the return of execve \ exit because they never return :)
     IF_TRUE_CLEANUP(__NR_execve == regs->di || __NR_exit == regs->di || __NR_exit_group == regs->di);
     
+    if (__NR_poll == regs->di) {
+        printk("POLL!\n");
+    }
+
 	// TODO: RECORD ONLY SPECIFIC PROCESSES
 	IF_TRUE_CLEANUP(current->pid != recorded_process_pid || recorded_process_pid == 0);
     IF_TRUE_CLEANUP(NULL != current_syscall_record, "Multiple syscall recording the same time not supported yet");
@@ -91,6 +95,7 @@ cleanup:
 
 int post_syscall(struct kretprobe_instance *probe, struct pt_regs *regs) {
 
+    printk("POST\n");
     IF_TRUE_CLEANUP(NULL == current_syscall_record, "Current syscall not defined!");
 
     current_syscall_record->ret = current_syscall_record->userspace_regs_ptr->ax;

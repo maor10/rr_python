@@ -1,5 +1,5 @@
-#ifndef SYSCALL_WRAPPER_H
-#define SYSCALL_WRAPPER_H
+#ifndef SYSCALL_HOOKER_H
+#define SYSCALL_HOOKER_H
 
 #include <linux/kfifo.h>
 #include <linux/list.h>

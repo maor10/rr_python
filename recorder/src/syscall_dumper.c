@@ -6,7 +6,7 @@
 #include <linux/slab.h>
 
 #include "utils.h"
-#include "syscall_wrapper.h"
+#include "syscall_hooker.h"
 #include "copy_to_user_wrapper.h"
 #include "syscall_dumper.h"
 

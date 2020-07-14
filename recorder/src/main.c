@@ -3,10 +3,11 @@
 #include <linux/kprobes.h>
 
 #include "utils.h"
-#include "syscall_hooker.h"
+#include "syscall_recorder.h"
 #include "copy_to_user_wrapper.h"
 #include "syscall_dumper.h"
 #include "recorded_processes_loader.h"
+#include "syscall_wrapper.h"
 
 MODULE_LICENSE("GPL");
 
@@ -16,11 +17,16 @@ static int __init recorder_init(void) {
 
 	IF_TRUE_CLEANUP(init_syscall_hook(), "Failed to init syscall hook");
 	IF_TRUE_GOTO(init_copy_hook(), cleanup_syscall_hook, "Failed to init syscall hook");
-	IF_TRUE_GOTO(init_syscall_dumper(), cleanup_copy_hook, "Failed to init syscall dumper!");
-	IF_TRUE_GOTO(init_recorded_processes_loader(), cleanup_copy_hook, "Failed to init syscall dumper!");
+	IF_TRUE_GOTO(init_syscall_wrappers(), cleanup_copy_hook, "Failed to init syscall wrapper!");
+	IF_TRUE_GOTO(init_syscall_dumper(), cleanup_syscall_wrapper, "Failed to init syscall dumper!");
+	IF_TRUE_GOTO(init_recorded_processes_loader(), cleanup_syscall_dumper, "Failed to init syscall dumper!");
 
 	return 0;
 
+cleanup_syscall_dumper:
+	remove_syscall_dumper();
+cleanup_syscall_wrapper:
+	remove_syscall_wrappers();
 cleanup_copy_hook:
 	remove_copy_hook();
 cleanup_syscall_hook:

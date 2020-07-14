@@ -3,7 +3,7 @@
 
 #include "utils.h"
 #include "copy_to_user_wrapper.h"
-#include "syscall_hooker.h"
+#include "syscall_recorder.h"
 #include "recorded_processes_loader.h"
 
 int pre_put(struct kretprobe_instance * probe, struct pt_regs *regs);
@@ -162,7 +162,7 @@ int pre_copy(struct kretprobe_instance * probe, struct pt_regs *regs) {
 
     current_copy = kmalloc(sizeof(struct copy_record_element) + copy_len, GFP_KERNEL);
     IF_TRUE_CLEANUP(NULL == current_copy, "Failed to alloc current copy!");
-    
+
     current_copy->record.from = (void *) regs->si;
     current_copy->record.to = (void *) regs->di;
     current_copy->record.len = copy_len;
@@ -216,6 +216,6 @@ cleanup:
 
 void remove_copy_hook(void)
 {
-   	unregister_kretprobes(copy_kretprobes, sizeof(copy_kretprobes));
-    unregister_kretprobes(put_user_kretprobes, sizeof(put_user_kretprobes));
+   	unregister_kretprobes(copy_kretprobes, sizeof(copy_kretprobes) / sizeof(struct kretprobe *));
+    unregister_kretprobes(put_user_kretprobes, sizeof(put_user_kretprobes) / sizeof(struct kretprobe *));
 }

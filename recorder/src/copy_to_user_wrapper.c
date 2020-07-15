@@ -6,7 +6,27 @@
 #include "syscall_recorder.h"
 #include "recorded_processes_loader.h"
 
+/*
+ * @purpose: Record all data kernel puts to userspace in processes we record
+ * 
+ * @notes: 
+ *      - Runs at the beggining of every put_user called on system.
+ *      - The pre_put function should just record put params, and wait for 
+ *          post_put to see if to put in syscalls writes.
+ * 
+ * @ret: 
+ *      1 == run post_put after syscall is done
+ *      0 == don't run post_put after syscall
+ */
 int pre_put(struct kretprobe_instance * probe, struct pt_regs *regs);
+
+/*
+ * @purpose: Record all data kernel puts to userspace in processes we record
+ * 
+ * @notes: 
+ *      - Runs at the after of every put_user we hooked and returned 0.
+ *      - The function takes saved put user and saves it to list
+ */
 int post_put(struct kretprobe_instance * probe, struct pt_regs *regs);
 
 /*
@@ -51,7 +71,7 @@ struct kretprobe put_user_1_kretprobes = {
         .entry_handler 	= pre_put,
         .handler		= post_put,
         .maxactive		= 1000,
-        .data_size      = 1
+        .data_size		= 1
 };
 
 struct kretprobe put_user_2_kretprobes = {
@@ -59,7 +79,7 @@ struct kretprobe put_user_2_kretprobes = {
         .entry_handler 	= pre_put,
         .handler		= post_put,
         .maxactive		= 1000,
-        .data_size      = 2
+        .data_size		= 2
 };
 
 struct kretprobe put_user_4_kretprobes = {
@@ -67,7 +87,7 @@ struct kretprobe put_user_4_kretprobes = {
         .entry_handler 	= pre_put,
         .handler		= post_put,
         .maxactive		= 1000,
-        .data_size      = 4
+        .data_size		= 4
 };
 
 struct kretprobe put_user_8_kretprobes = {
@@ -75,7 +95,7 @@ struct kretprobe put_user_8_kretprobes = {
         .entry_handler 	= pre_put,
         .handler		= post_put,
         .maxactive		= 1000,
-        .data_size      = 8
+        .data_size		= 8
 };
 
 struct kretprobe * put_user_kretprobes[] = {
@@ -107,6 +127,8 @@ int pre_put(struct kretprobe_instance * probe, struct pt_regs *regs) {
     copy_len = probe->rp->data_size;
     
     current_copy = kmalloc(sizeof(struct copy_record_element) + copy_len, GFP_KERNEL);
+    IF_TRUE_CLEANUP(NULL == current_copy, "Failed to alloc current put!");
+
     current_copy->record.from = (void *) NULL;
     current_copy->record.to = (void *) regs->cx;
     current_copy->record.len = copy_len;
@@ -128,7 +150,6 @@ int pre_put(struct kretprobe_instance * probe, struct pt_regs *regs) {
     }
 
     return 0;
-
 cleanup:
     return 1;
 }
@@ -216,6 +237,6 @@ cleanup:
 
 void remove_copy_hook(void)
 {
-   	unregister_kretprobes(copy_kretprobes, sizeof(copy_kretprobes) / sizeof(struct kretprobe *));
+    unregister_kretprobes(copy_kretprobes, sizeof(copy_kretprobes) / sizeof(struct kretprobe *));
     unregister_kretprobes(put_user_kretprobes, sizeof(put_user_kretprobes) / sizeof(struct kretprobe *));
 }

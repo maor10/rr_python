@@ -8,6 +8,7 @@
 #include "recorded_processes_loader.h"
 
 
+// See docs for explenation
 struct syscall_wrapper {
     int (*get_record_mem_callback) (struct pt_regs *, void * __user *, unsigned long *);
     struct kretprobe retprobe;
@@ -19,8 +20,19 @@ struct syscall_recorded_mem {
     unsigned char mem[];
 };
 
+/*
+ * @purpose: get memory to record before poll syscall
+ */
 int get_poll_record_mem(struct pt_regs * regs, void * __user *addr, unsigned long *len);
+
+/*
+ * @purpose: Function to be called before wrapped syscall
+ */
 int pre_wrap_syscall(struct kretprobe_instance * probe, struct pt_regs *regs);
+
+/*
+ * @purpose: Function to be called after wrapped syscall
+ */
 int post_wrap_syscall(struct kretprobe_instance * probe, struct pt_regs *regs);
 
 struct syscall_wrapper poll_wrapper = {
@@ -102,7 +114,8 @@ int post_wrap_syscall(struct kretprobe_instance * probe, struct pt_regs *regs) {
     for (i = 0;i < recorded_mem->len; i++) {
         if (recorded_mem->mem[i] != new_mem[i]) {
             current_copy = kmalloc(sizeof(struct copy_record_element) + 1, GFP_KERNEL);
-            // TODO TODO TODO WHAT IF KMALLOC FAILS!!!!
+            IF_TRUE_GOTO(NULL == current_copy, cleanup_new_mem, "Failed to alloc current 1 byte copy!");
+
             current_copy->record.from = (void *) NULL;
             current_copy->record.to = recorded_mem->ptr + i;
             current_copy->record.len = 1;

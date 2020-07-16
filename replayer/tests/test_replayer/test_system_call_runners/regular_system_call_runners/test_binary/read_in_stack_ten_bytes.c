@@ -20,25 +20,22 @@ int main(int argc, char *argv[]) {
   int expected_return_value = atoi(argv[2]);
   char *expected_buffer = argv[3];
   int fd = -1;
-  char *buffer = malloc(length);
+
+  char buffer[10];
+
   ssize_t size;
 
-  printf("test - Waiting....\n");
-  raise(SIGSTOP);
-  printf("test - Continuing!\n");
+  kill(getpid(), SIGSTOP);
 
   size = read(fd, buffer, length);
 
   if (size != expected_return_value) {
-    fprintf( stderr, "Expected %d, got %ld\n", expected_return_value, size);
     return -1;
   }
 
   if (strcmp(buffer, expected_buffer) != 0) {
-    fprintf( stderr, "Expected %s, got %s\n", expected_buffer, buffer);
     return -1;
   }
 
-  printf("EXITiNG\n");
   return 0;
 }

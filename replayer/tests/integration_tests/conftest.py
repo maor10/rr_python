@@ -28,9 +28,11 @@ def scripts_path():
 def run_python_script(scripts_path):
     processes = []
 
-    def _run_script(script_name):
-        process = subprocess.Popen(["python3", str(scripts_path / script_name)]
-                                   , stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+    def _run_script(script_name, arguments=None):
+        arguments = arguments or []
+        process = subprocess.Popen(["python3", str(scripts_path / script_name), *arguments],
+                                   # stdout=subprocess.PIPE,
+                                   stderr=subprocess.PIPE,
                                    stdin=subprocess.PIPE)
         processes.append(process)
         return process

@@ -6,18 +6,21 @@
 
 
 #define RETURN_NULL_ON_TRUE(arg) if (arg) {   \
+  LOG("Returning NULL (Raise last python error)");  \
   return NULL; \
 }
 
 
 #define RAISE_EXCEPTION_ON_TRUE(arg, ...) if (arg) {   \
   PyErr_Format(PyExc_ValueError, __VA_ARGS__); \
+  LOG("Raising exception...");  \
   return NULL; \
 }
 
 
 #define RAISE_EXCEPTION_WITH_ERRNO_ON_TRUE(arg) if (arg) {   \
   PyErr_Format(PyExc_ValueError, "%s", strerror(errno)); \
+  LOG("Raising exception with errno");  \
   return NULL; \
 }
 
@@ -26,10 +29,10 @@
   Py_RETURN_NONE;   \
 }
 
-/** #define LOG(...) printf(__VA_ARGS__);  \
-   printf("\n");
-**/
+#define LOG(...) printf("%s:%i - ", __FILE__, __LINE__); \
+    printf(__VA_ARGS__);  \
+    printf("\n");
 
-#define LOG(...) ;
+// #define LOG(...) ;
 
 #endif

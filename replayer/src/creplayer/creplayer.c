@@ -6,13 +6,14 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/ptrace.h>
+#include <linux/ptrace.h>
 #include <sys/user.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 
 #include "utils.h"
 #include <sys/signal.h>
-
+#include <poll.h>
 
 /**
  * Python module
@@ -32,6 +33,12 @@ PyObject *syscall_handler = NULL;
 PyObject *is_supported_callback = NULL;
 
 
+/** 
+ * Callback to verify ran sys call result
+ **/
+PyObject *ran_syscall_validator = NULL;
+
+
 /**
  * Pid of process to replay
  **/ 
@@ -46,11 +53,11 @@ int pid_to_ptrace;
  * and then simulating the sys call ourselves via a pythonic handler before continuing execution of tracee 
  *
  **/
-PyObject* simulate_sys_call(struct user_regs_struct regs) {
+PyObject* simulate_syscall(int current_syscall_index, struct user_regs_struct regs) {
   PyObject *syscall_result_obj = NULL;
-  PyObject *sys_call_arg_list = NULL;
+  PyObject *syscall_arg_list = NULL;
   int syscall = regs.orig_rax;
-  long sys_call_result;
+  long syscall_result;
 
   LOG("Running invalid syscall...");
 
@@ -62,17 +69,17 @@ PyObject* simulate_sys_call(struct user_regs_struct regs) {
 
   LOG("Simulating real sys call...");
 
-  sys_call_arg_list = Py_BuildValue(
-    "(KKKKKKKKKKKKKKKKK)", syscall, regs.rax, regs.rbx, regs.rcx, regs.rdx, 
+  syscall_arg_list = Py_BuildValue(
+    "(iKKKKKKKKKKKKKKKKK)", current_syscall_index, syscall, regs.rax, regs.rbx, regs.rcx, regs.rdx, 
   regs.rbp, regs.rsp, regs.rsi, regs.rdi, regs.r8, regs.r9, regs.r10, regs.r11, regs.r12, regs.r13, regs.r14, regs.r15);
-  syscall_result_obj = PyObject_CallObject(syscall_handler, sys_call_arg_list);
-  Py_DECREF(sys_call_arg_list);
+  syscall_result_obj = PyObject_CallObject(syscall_handler, syscall_arg_list);
+  Py_DECREF(syscall_arg_list);
 
   RETURN_NULL_ON_TRUE(syscall_result_obj == NULL);
-  sys_call_result = PyLong_AsLong(syscall_result_obj);
+  syscall_result = PyLong_AsLong(syscall_result_obj);
   Py_XDECREF(syscall_result_obj);
   
-  regs.rax = sys_call_result;
+  regs.rax = syscall_result;
   RAISE_EXCEPTION_WITH_ERRNO_ON_TRUE(ptrace(PTRACE_SETREGS, pid_to_ptrace, 0, &regs) == -1);
 
   LOG("Finished simulation, continue running...");
@@ -101,55 +108,50 @@ PyObject* attach_to_tracee_and_begin() {
 
 
 /**
- * @purpose: Determine whether syscall is supported by replayer or not
- * 
- * This is a wrapper function for the callback supplied by python
- * 
- **/
-PyObject* is_syscall_supported(long long int syscall) {
-  PyObject *is_supported_arg_list = Py_BuildValue("(K)", syscall);
-  PyObject *is_supported_result_obj = PyObject_CallObject(is_supported_callback, is_supported_arg_list);
-  Py_DECREF(is_supported_arg_list);
-  return is_supported_result_obj;
-}
-
-
-/**
  * @purpose: Replay execution of a program, simulating all known sys calls 
  **/
 
 PyObject* replay() {
   struct user_regs_struct regs;
   siginfo_t siginfo;
+  int exit_code;
   PyObject* is_supported_result_obj;
+  int current_syscall_index = 0;
 
+  
+  LOG("Replaying...");
   RETURN_NULL_ON_TRUE(attach_to_tracee_and_begin() == NULL);
   LOG("Beginning to run sys call loop...");
+
   for (;;) {
-    // If we fail here with No such process, the process exited after the last sys call
-    RETURN_PY_NONE_ON_TRUE( ptrace(PTRACE_GETSIGINFO, pid_to_ptrace, 0, &siginfo) == -1 && errno == ESRCH);
+    if (ptrace(PTRACE_GETSIGINFO, pid_to_ptrace, 0, &siginfo) == -1 && errno == ESRCH) {
+      return Py_BuildValue("i", WEXITSTATUS(exit_code));
+    }
     RAISE_EXCEPTION_ON_TRUE(siginfo.si_signo == SIGSEGV, "Tracee segfaulted");
     
     RAISE_EXCEPTION_WITH_ERRNO_ON_TRUE(ptrace(PTRACE_SYSCALL, pid_to_ptrace, 0, 0) == -1);
     waitpid(pid_to_ptrace, 0, 0);
 
     RAISE_EXCEPTION_WITH_ERRNO_ON_TRUE(ptrace(PTRACE_GETREGS, pid_to_ptrace, 0, &regs) == -1);
-    
-    // LOG("received syscall %lld", regs.orig_rax);
 
-    is_supported_result_obj = is_syscall_supported(regs.orig_rax);
+    LOG("received syscall %lld", regs.orig_rax);
+
+    is_supported_result_obj = PyObject_CallFunction(is_supported_callback, "(iK)", current_syscall_index, regs.orig_rax);
     RETURN_NULL_ON_TRUE(is_supported_result_obj == NULL);
+    Py_DECREF(is_supported_result_obj);
 
     if (!PyObject_IsTrue(is_supported_result_obj)) {
       RAISE_EXCEPTION_WITH_ERRNO_ON_TRUE(ptrace(PTRACE_SYSCALL, pid_to_ptrace, 0, 0) == -1);
-      waitpid(pid_to_ptrace, 0, WUNTRACED);
-      continue;
+      waitpid(pid_to_ptrace, &exit_code, 0);
+      if (ptrace(PTRACE_GETREGS, pid_to_ptrace, 0, &regs) != -1) {
+        RETURN_NULL_ON_TRUE(PyObject_CallFunction(ran_syscall_validator, "(iK)", current_syscall_index, regs.rax) == NULL);
+      }
+    } else {
+      RETURN_NULL_ON_TRUE(simulate_syscall(current_syscall_index, regs) == NULL);
     }
 
-    RETURN_NULL_ON_TRUE(simulate_sys_call(regs) == NULL);
+    current_syscall_index++;
   }
-
-  Py_RETURN_NONE;
 }
 
 
@@ -186,12 +188,14 @@ PyObject* write_buffer_to_tracee(long addr, char *buffer, int length) {
 
 
 static PyObject* start_replay_with_pid_and_handlers(PyObject *self, PyObject *args) {
-  RETURN_NULL_ON_TRUE(!PyArg_ParseTuple(args, "iOO", &pid_to_ptrace, &is_supported_callback,
+  RETURN_NULL_ON_TRUE(!PyArg_ParseTuple(args, "iOOO", &pid_to_ptrace, &is_supported_callback,
+  &ran_syscall_validator,
   &syscall_handler));
-  
   RAISE_EXCEPTION_ON_TRUE(!PyCallable_Check(is_supported_callback), "Is supported callback must be callable");
   RAISE_EXCEPTION_ON_TRUE(!PyCallable_Check(syscall_handler), "Handler must be callable");
+  RAISE_EXCEPTION_ON_TRUE(!PyCallable_Check(ran_syscall_validator), "Validator must be callable");
   
+  LOG("Let's Replaying...");
   return replay();
 }
 
@@ -211,7 +215,7 @@ static PyMethodDef methods[]= {
 	{"start_replay_with_pid_and_handlers", (PyCFunction)start_replay_with_pid_and_handlers, METH_VARARGS, "(todo docs)"},
   {"set_memory_in_replayed_process", (PyCFunction)set_memory_in_replayed_process, METH_VARARGS, "(todo docs)"},
 	{NULL, NULL, 0, 0}
-};
+}; 
 
 
 static struct PyModuleDef creplayerModule = {

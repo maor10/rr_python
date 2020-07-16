@@ -5,8 +5,12 @@ from pathlib import Path
 import replayer
 import pytest
 
-from replayer.replayer import Replayer, run_replayer
+from replayer import run_replayer
 from replayer.system_call_runners import SystemCallRunner
+
+
+class CompileException(Exception):
+    pass
 
 
 def get_output_path_for_binary_with_name(name):
@@ -20,8 +24,10 @@ def compile_binary():
     def _compile_binary(name):
         nonlocal binary_name
         binary_name = name
-        test_binary_directory = Path(replayer.__file__).parent.parent.parent / 'tests' / 'test_binary'
-        os.system(f"gcc -o {get_output_path_for_binary_with_name(binary_name)} {test_binary_directory}/{binary_name}.c")
+        test_binary_directory = Path(__file__).parent / 'test_binary'
+        success = os.system(f"gcc -o {get_output_path_for_binary_with_name(binary_name)} {test_binary_directory}/{binary_name}.c")
+        if success != 0:
+            raise CompileException()
         os.system(f"chmod 777 {get_output_path_for_binary_with_name(binary_name)}")
     yield _compile_binary
 
@@ -41,11 +47,11 @@ def run_test_binary(compile_binary):
         nonlocal process
         compile_binary(binary_name)
         process = subprocess.Popen([str(get_output_path_for_binary_with_name(binary_name)), *args],
-                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                                   stderr=subprocess.PIPE)
         return process
 
     yield _run_popen
-    if process.poll() is None:
+    if process is not None and process.poll() is None:
         process.terminate()
 
 
@@ -65,10 +71,9 @@ def run_system_calls_on_binary(run_test_binary):
             if sys_call_number in system_call_numbers_to_handle
         }
         SystemCallRunner.SYSTEM_CALL_NUMBERS_TO_SYSTEM_CALL_RUNNERS = new_system_call_numbers_to_runners
-        run_replayer(child.pid, system_calls=system_calls)
-
-        out, err = child.communicate()
-        assert not err, f"Failed, binary output: {err.decode('utf-8')}"
+        exit_code = run_replayer(child.pid, system_calls=system_calls)
+        _, err = child.communicate()
+        assert exit_code == 0, err
 
     yield _run
 

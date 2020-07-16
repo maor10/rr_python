@@ -2,15 +2,18 @@ from abc import ABCMeta
 from replayer.system_call_runners import SystemCallRunner
 from replayer.system_call_runners.regular_system_call_runner.regular_system_call_definition import \
     RegularSystemCallDefinition, REGULAR_SYSTEM_CALL_DEFINITIONS
+from .exceptions import CouldNotFindMemoryCopyForAddressException
 from .fs_system_call_definitions import *
+from .socket_system_call_definitions import *
+from ..streams import create_streams_from_memory_copies
 
 
 class RegularSystemCallRunnerMetaclass(ABCMeta):
 
     def __init__(cls, name, bases, dct):
         super(RegularSystemCallRunnerMetaclass, cls).__init__(name, bases, dct)
-        for regular_system_call_definition in REGULAR_SYSTEM_CALL_DEFINITIONS:
-            cls.SYSTEM_CALL_NUMBERS_TO_SYSTEM_CALL_RUNNERS[regular_system_call_definition.system_call_number] = cls
+        for sys_call_number in REGULAR_SYSTEM_CALL_DEFINITIONS:
+            cls.SYSTEM_CALL_NUMBERS_TO_SYSTEM_CALL_RUNNERS[sys_call_number] = cls
 
 
 class RegularSystemCallRunner(SystemCallRunner, metaclass=RegularSystemCallRunnerMetaclass):
@@ -19,7 +22,13 @@ class RegularSystemCallRunner(SystemCallRunner, metaclass=RegularSystemCallRunne
 
     def perform_sys_call(self) -> int:
         system_call_definition: RegularSystemCallDefinition = REGULAR_SYSTEM_CALL_DEFINITIONS[self.system_call_number]
-        if system_call_definition.memory_address_register_name is not None:
-            buffer_address = self.register_values[system_call_definition.memory_address_register_name]
-            self.write_memory_copies_to_address(buffer_address)
+        recorded_starting_addresses_to_replaying_starting_addresses = {
+            self.recorded_system_call.registers[register_name]: self.register_values[register_name]
+            for register_name in system_call_definition.memory_address_register_names
+        }
+        streams = create_streams_from_memory_copies(self.recorded_system_call.memory_copies,
+                                                    recorded_starting_addresses_to_replaying_starting_addresses)
+        for stream in streams:
+            stream.write_memory_copies()
+
         return self.recorded_system_call.return_value

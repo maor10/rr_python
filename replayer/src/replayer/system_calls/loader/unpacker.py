@@ -14,6 +14,11 @@ class BinaryUnpacker:
 
         return ret
 
+    def unpack_signed_long(self):
+        ret = struct.unpack("<q", self.buffer[:self.UNSIGNED_LONG_SIZE])[0]
+        self.buffer = self.buffer[self.UNSIGNED_LONG_SIZE:]
+        return ret
+
     def unpack_str(self, str_len):
         ret = self.buffer[:str_len]
         self.buffer = self.buffer[str_len:]

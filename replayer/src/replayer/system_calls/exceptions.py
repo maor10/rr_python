@@ -1,0 +1,3 @@
+
+class CouldNotFindMatchingSyscallException(Exception):
+    pass

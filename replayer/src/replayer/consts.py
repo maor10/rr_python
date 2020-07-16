@@ -17,6 +17,8 @@ REGISTER_NAMES = ['rax',
 
 SYS_CALL_REGISTER = 'orig_ax'
 
+EXIT_GROUP_SYSCALL_NUM = 231
+
 SYS_CALL_NAMES = {
     288: "accept4",
     43: "accept",
@@ -351,6 +353,5 @@ SYS_CALL_NAMES = {
     247: "waitid",
     1: "write",
     20: "writev",
-
 
 }

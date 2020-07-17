@@ -1,7 +1,6 @@
 #include <linux/kernel.h>
 #include <linux/kprobes.h>
 #include <linux/poll.h>
-#include <linux/socket.h>
 
 #include "utils.h"
 #include "copy_to_user_wrapper.h"
@@ -26,14 +25,6 @@ struct syscall_recorded_mem {
  */
 int get_poll_record_mem(struct pt_regs * regs, void * __user *addr, unsigned long *len);
 
-
-/*
- * @purpose: get memory to record before recvmsg syscall
- */
-int get_recvmsg_record_mem(struct pt_regs * regs, void * __user *addr, unsigned long *len);
-
-
-
 /*
  * @purpose: Function to be called before wrapped syscall
  */
@@ -53,31 +44,14 @@ struct syscall_wrapper poll_wrapper = {
     .retprobe.data_size	    	= sizeof(struct poll_recorded_mem *),
 };
 
-struct syscall_wrapper recvmsg_wrapper = {
-    .get_record_mem_callback    = get_recvmsg_record_mem,
-    .retprobe.kp.symbol_name	= "___sys_recvmsg",
-    .retprobe.entry_handler 	= pre_wrap_syscall,
-    .retprobe.handler		    = post_wrap_syscall,
-    .retprobe.maxactive	    	= 1000,
-    .retprobe.data_size	    	= sizeof(struct poll_recorded_mem *),
-};
-
-
 struct kretprobe * syscall_wrappers[] = {
-    &(poll_wrapper.retprobe),
-    &(recvmsg_wrapper.retprobe)
+    &(poll_wrapper.retprobe)
 };
 
 int get_poll_record_mem(struct pt_regs * regs, void * __user *addr, unsigned long *len) {
     *addr = (void __user *) regs->di;
     *len = regs->si * sizeof(struct pollfd);
 
-    return 0;
-}
-
-int get_recvmsg_record_mem(struct pt_regs * regs, void * __user *addr, unsigned long *len) {
-    *addr = (void __user *) regs->si;
-    *len = sizeof(struct user_msghdr);
     return 0;
 }
 
@@ -166,6 +140,13 @@ int init_syscall_wrappers(void) {
     );
 
     return 0;
+}
+
+int init_syscall_wrappers(void) {
+    IF_TRUE_CLEANUP(
+        0 > register_kretprobes(syscall_wrappers, sizeof(syscall_wrappers) / sizeof(struct kretprobe *)),
+        "Failed to init copy kprobe!"
+    );
 
 cleanup:
     return -1;

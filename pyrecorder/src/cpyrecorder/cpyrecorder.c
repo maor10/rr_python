@@ -6,11 +6,10 @@
 #include <string.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <sys/ptrace.h>
-#include <linux/ptrace.h>
 #include <sys/user.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <signal.h>
 
 #include "utils.h"
 
@@ -18,6 +17,13 @@
 #define STOP_STEP 0
 #define STOP_NEXT 1
 #define STOP_RET 2
+
+#define FAILED_OPENING_PDB -1
+#define IN_PARENT 0
+#define IN_PDB 1
+
+
+#define REPLAY_ENVIRONMENT_FILE_PATH "/tmp/replay"
 
 
 /**
@@ -39,7 +45,17 @@ PyFrameObject *stop_frame;
 int stop_type;
 
 
+/**
+ * Returns 1/-1 on forked process, and 0 on parent 
+ **/
 int fork_and_debug() {
+  if (fork() == 0) {
+   // TODO what to run here???
+   return PyRun_SimpleString("import ipdb; ipdb.set_trace();") == 0; 
+  } else {
+    // Wait to be woken up to continue
+    kill(getpid(), SIGSTOP);
+  }
   return 0;
 }
 
@@ -65,27 +81,39 @@ int should_stop(PyFrameObject *frame) {
 
 // TODO: figure out what are these params
 int tracer(PyObject *obj, PyFrameObject *frame, int what, PyObject *obj2) {
+  int fork_and_debug_res;
+
   if (what == PyTrace_LINE) {
     if (should_stop(frame)) {
-      // TODO: make this run our debugger
-      PyRun_SimpleString("import ipdb; ipdb.set_trace();");
+      return fork_and_debug();
     }
   }
   return 0;
 }
 
+
+int in_replay_environment() {
+  FILE *file = fopen(REPLAY_ENVIRONMENT_FILE_PATH, "r");
+  if (file){
+        fclose(file);
+        return 1;
+    }
+    return 0;
+}
+
+
 static PyObject* record_or_replay(PyObject *self, PyObject *args) {
   PyThreadState *state;
-
   // check if replaying  
   // TODO: how to know??
-  if (1) {
+  if (in_replay_environment()) {
+    signal(SIGINT, handle_sigint); 
     state = PyGILState_GetThisThreadState();
     // We need to check if c_traceobj is NULL, as Python will XDECREF it in PyEval_SetTrace, 
     // potentially creating a difference in the memory between record and replay when the garbage collector comes 
     RAISE_EXCEPTION_ON_TRUE (state->c_traceobj != NULL, "Trace obj is currently set! Replaying will potentially corrupt memory state :/");
     PyEval_SetTrace(tracer, NULL);
-    LOG("Set trace func\n");
+    kill(getpid(), SIGSTOP);
   }
 
   Py_RETURN_NONE;
@@ -109,6 +137,7 @@ static struct PyModuleDef cpyrecorderModule = {
 PyMODINIT_FUNC PyInit_cpyrecorder(void) {
 	module = PyModule_Create(&cpyrecorderModule);
   PyModule_AddStringConstant(module, "version", "1.0.0");
+  PyModule_AddStringConstant(module, "REPLAY_ENVIRONMENT_FILE_PATH", REPLAY_ENVIRONMENT_FILE_PATH);
 	return module;
 }
 

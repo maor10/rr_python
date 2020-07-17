@@ -55,7 +55,7 @@ struct syscall_wrapper poll_wrapper = {
 
 struct syscall_wrapper recvmsg_wrapper = {
     .get_record_mem_callback    = get_recvmsg_record_mem,
-    .retprobe.kp.symbol_name	= "__sys_recvmsg",
+    .retprobe.kp.symbol_name	= "___sys_recvmsg",
     .retprobe.entry_handler 	= pre_wrap_syscall,
     .retprobe.handler		    = post_wrap_syscall,
     .retprobe.maxactive	    	= 1000,
@@ -76,12 +76,8 @@ int get_poll_record_mem(struct pt_regs * regs, void * __user *addr, unsigned lon
 }
 
 int get_recvmsg_record_mem(struct pt_regs * regs, void * __user *addr, unsigned long *len) {
-    struct msghdr *hdr = (struct msghdr *)regs->si;
-    *addr = (void __user *) hdr->msg_control;
-    *len = (unsigned long) hdr->msg_controllen;
-    
-    LOG("GOT RCV MSG %zu", hdr->msg_controllen);
-
+    *addr = (void __user *) regs->si;
+    *len = sizeof(struct user_msghdr);
     return 0;
 }
 

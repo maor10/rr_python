@@ -42,6 +42,7 @@ ssize_t write_proc(struct file *file, const char __user *ubuf, size_t count, lof
 
 	size_written = strlen(buf);
 	*ppos = size_written;
+
 	return size_written;
 cleanup:
     return -EFAULT;

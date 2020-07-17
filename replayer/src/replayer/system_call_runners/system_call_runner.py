@@ -2,7 +2,6 @@ from abc import ABCMeta, abstractmethod
 from typing import Dict, Type, List, Tuple
 
 from replayer.system_calls import SystemCall
-import creplayer
 from replayer.system_call_runners.exceptions import InvalidSyscallException
 
 

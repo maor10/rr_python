@@ -31,12 +31,24 @@ sendto_system_call_definition = create_regular_system_call_definition(
 
 recvfrom_system_call_definition = create_regular_system_call_definition(
     system_call_number=45,
-    memory_address_registers=["rsi"]
+    memory_address_registers=["rsi", 'r9']
 )
 
 
-sendmsg_system_call_definition = create_regular_system_call_definition(
+sendmmsg_system_call_definition = create_regular_system_call_definition(
     system_call_number=46,
+)
+
+
+recvmsg_system_call_definition = create_regular_system_call_definition(
+    system_call_number=47,
+    memory_address_registers=['rsi']
+)
+
+
+bind_system_call_definition = create_regular_system_call_definition(
+    system_call_number=49,
+    # TODO
 )
 
 
@@ -71,6 +83,7 @@ uname_system_call_definition = create_regular_system_call_definition(
 
 sendmmsg_system_call_definition = create_regular_system_call_definition(
     system_call_number=307,
+    memory_address_registers=['rsi']
 )
 
 

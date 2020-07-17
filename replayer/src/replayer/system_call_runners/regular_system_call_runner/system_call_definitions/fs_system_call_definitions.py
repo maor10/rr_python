@@ -45,11 +45,6 @@ lseek_system_call_definition = create_regular_system_call_definition(
     system_call_number=8
 )
 
-
-ioctl_system_call_definition = create_regular_system_call_definition(
-    system_call_number=16
-)
-
 openat_system_call_definition = create_regular_system_call_definition(
     system_call_number=257,
     memory_address_registers=['rsi']

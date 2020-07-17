@@ -23,6 +23,7 @@ int main(int argc, char *argv[]) {
     .events = POLLIN,
     .revents = 100
   };
+  struct msghdr *message
   int res;
 
   kill(getpid(), SIGSTOP);

@@ -2,10 +2,8 @@ from abc import ABCMeta
 from replayer.system_call_runners import SystemCallRunner
 from replayer.system_call_runners.regular_system_call_runner.regular_system_call_definition import \
     RegularSystemCallDefinition, REGULAR_SYSTEM_CALL_DEFINITIONS
-from .exceptions import CouldNotFindMemoryCopyForAddressException
-from .fs_system_call_definitions import *
-from .socket_system_call_definitions import *
 from ..streams import create_streams_from_memory_copies
+from .system_call_definitions import *
 
 
 class RegularSystemCallRunnerMetaclass(ABCMeta):
@@ -21,6 +19,8 @@ class RegularSystemCallRunner(SystemCallRunner, metaclass=RegularSystemCallRunne
     SYSTEM_CALL_NUMBER = None
 
     def perform_sys_call(self) -> int:
+        if self.system_call_number == 47:
+            import ipdb; ipdb.set_trace()
         system_call_definition: RegularSystemCallDefinition = REGULAR_SYSTEM_CALL_DEFINITIONS[self.system_call_number]
         recorded_starting_addresses_to_replaying_starting_addresses = {
             self.recorded_system_call.registers[register_name]: self.register_values[register_name]

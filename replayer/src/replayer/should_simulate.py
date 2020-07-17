@@ -1,12 +1,11 @@
-from dataclasses import dataclass
 from typing import List, Callable, Union
 
 from replayer.system_calls.system_call import SystemCall
 from replayer.system_call_runners import SystemCallRunner
 from replayer.system_calls.exceptions import CouldNotFindMatchingSyscallException
-from replayer.system_call_runners.regular_system_call_runner.fs_system_call_definitions import open_system_call_definition, \
+from replayer.system_call_runners.regular_system_call_runner.system_call_definitions.fs_system_call_definitions import open_system_call_definition, \
     openat_system_call_definition, close_system_call_definition
-from replayer.system_call_runners.regular_system_call_runner.socket_system_call_definitions \
+from replayer.system_call_runners.regular_system_call_runner.system_call_definitions.socket_system_call_definitions \
     import socket_system_call_definition
 
 

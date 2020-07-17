@@ -1,3 +1,3 @@
 from .system_call_runner import SystemCallRunner
 from .regular_system_call_runner import RegularSystemCallRunner
-from .poll_system_call_runner import PollSystemCallRunner
+from .ioctl_system_call_runner import IoctlSystemCallRunner

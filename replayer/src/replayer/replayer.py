@@ -52,6 +52,7 @@ class Replayer:
 
         system_call = self.system_calls[sys_call_index]
         if system_call.num != sys_call_number:
+            print(f"GOT TO {sys_call_index} / {len(self.system_calls)}")
             raise UnexpectedSysCallException(expected=system_call.num,
                                              received=sys_call_number)
 

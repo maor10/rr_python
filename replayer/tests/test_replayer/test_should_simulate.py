@@ -2,7 +2,7 @@ import pytest
 
 from replayer.consts import SYS_CALL_REGISTER
 from replayer.should_simulate import MMAP_SYSTEM_CALL_NUMBER, should_simulate_system_call
-from replayer.system_call_runners.regular_system_call_runner.fs_system_call_definitions import \
+from replayer.system_call_runners.regular_system_call_runner.system_call_definitions.fs_system_call_definitions import \
     open_system_call_definition, close_system_call_definition
 from replayer.system_calls import SystemCall
 

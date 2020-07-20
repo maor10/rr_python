@@ -55,15 +55,14 @@ class Replayer:
         system_call = self.system_calls[sys_call_index]
         register_values = self._get_register_values(registers)
 
-        # if system_call.num != sys_call_number:
-        #     import ipdb; ipdb.set_trace()
-        #     print(f"{sys_call_index} / {len(self.system_calls)}")
-        #     raise UnexpectedSysCallException(expected=system_call.num,
-        #                                      received=sys_call_number)
-        #
-        # if sys_call_number not in [3, 5, 9, 10]:
-        #     for k, v in register_values.items():
-        #         assert system_call.registers[k] == v, f"(In {system_call.name}) Unexpected for {k}, expected {system_call.registers[k]} got {v}"
+        if system_call.num != sys_call_number:
+            print(f"{sys_call_index} / {len(self.system_calls)}")
+            raise UnexpectedSysCallException(expected=system_call.num,
+                                             received=sys_call_number)
+
+        if sys_call_number not in [3, 5, 9, 10]:
+            for k, v in register_values.items():
+                assert system_call.registers[k] == v, f"(In {system_call.name}) Unexpected for {k}, expected {system_call.registers[k]} got {v}"
 
         return should_simulate_system_call(self.system_calls, system_call_index=sys_call_index)
 

@@ -15,7 +15,6 @@ PyObject *module = NULL;
 static PyObject* take_snapshot(PyObject* self, PyObject *args) {
     int pid = 0;
     int dir_fd = 0;
-    int res = 0;
     const char* file_path = NULL;
 
     if (!PyArg_ParseTuple(args, "is", &pid, &file_path))  {

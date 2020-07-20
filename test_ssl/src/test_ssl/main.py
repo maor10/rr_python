@@ -6,7 +6,7 @@ from pyrecorder import record
 
 
 def get_random():
-    return ctest_ssl.run_random()
+    return f"RANDOM IS {ctest_ssl.run_random()}"
 
 
 if __name__ == '__main__':

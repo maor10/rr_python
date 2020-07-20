@@ -4,7 +4,7 @@ import os
 import click
 import cpager
 from pager import Listener
-from pager.consts import BASE_DIRECTORY
+from pager.consts import BASE_DIRECTORY, DUMP_DIRECTORY
 
 
 def is_root_user() -> bool:
@@ -31,12 +31,12 @@ def list_pids():
 
 
 @cli.command()
-@click.option('--pid', prompt='PID to restore')
-def restore(pid):
+# @click.option('--pid', prompt='PID to restore')
+def restore():
     if not is_root_user():
         print("You must be root to run restore")
         return
-    cpager.restore_from_snapshot(str(BASE_DIRECTORY / pid))
+    cpager.restore_from_snapshot(str(DUMP_DIRECTORY))
 
 
 if __name__ == '__main__':

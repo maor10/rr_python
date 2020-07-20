@@ -87,7 +87,7 @@ def _mmap_appears_after_open_for_fd(fd: int, system_calls: List[SystemCall], sys
     system_call = _find_first_syscall_matching(reversed(system_calls[:system_call_index]),
                                                matcher_callback=lambda s: (_is_open_system_call_for_fd(s, fd)
                                                                            or _is_mmap_system_call_for_fd(s, fd)),
-                                               raise_if_not_found=True)
+                                               raise_if_not_found=False)
     return system_call is not None and system_call.num == MMAP_SYSTEM_CALL_NUMBER
 
 
@@ -98,10 +98,6 @@ def _should_simulate_open_system_call(system_calls, system_call, system_call_ind
 def _should_simulate_close_system_call(system_calls, system_call, system_call_index):
     return not _mmap_appears_after_open_for_fd(system_call.registers['rdi'],  # rdi is register of the fd for close
                                                system_calls, system_call_index)
-
-
-def _should_simulate_regular_system_call(system_calls, system_call, system_call_index):
-    return system_call.num in SystemCallRunner.SYSTEM_CALL_NUMBERS_TO_SYSTEM_CALL_RUNNERS
 
 
 def should_simulate_system_call(system_calls: List[SystemCall], system_call_index: int) -> bool:
@@ -116,8 +112,11 @@ def should_simulate_system_call(system_calls: List[SystemCall], system_call_inde
     """
     system_call = system_calls[system_call_index]
     handler = {
-        openat_system_call_definition.system_call_number: _should_simulate_open_system_call,
-        open_system_call_definition.system_call_number: _should_simulate_open_system_call,
-        close_system_call_definition.system_call_number: _should_simulate_close_system_call
-    }.get(system_call.num, _should_simulate_regular_system_call)
+        openat_system_call_definition.system_call_number: lambda *_: False, #_should_simulate_open_system_call,
+        open_system_call_definition.system_call_number: lambda *_: False, #_should_simulate_open_system_call,
+        close_system_call_definition.system_call_number: lambda *_: False, #_should_simulate_close_system_call,
+        MMAP_SYSTEM_CALL_NUMBER: lambda *_: False,
+        10: lambda *_: False,
+        41: lambda *_: False
+    }.get(system_call.num, lambda *_: True)
     return handler(system_calls, system_call, system_call_index)

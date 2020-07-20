@@ -4,7 +4,10 @@ import socket
 from interruptingcow import timeout
 from pytest import fixture
 
+from pager.consts import DUMP_DIRECTORY
 from replayer import run_replayer_on_records_at_path
+import cpager
+
 
 HOST = 'localhost'
 PORT = 8001
@@ -37,11 +40,11 @@ def socket_listener():
 
 
 def test_sockets_record_and_replay_happy_flow(run_python_script, recorder_context_manager, dumper_context_manager,
-                     scripts_path, replaying_context_manager, records_path):
+                     scripts_path, replaying_context_manager, records_path, pager_listener_context_manager):
     expected_output = b'Hi Son'
     script_name = "sockets.py"
     arguments = [HOST, str(PORT), expected_output]
-    with socket_listener(), recorder_context_manager(), dumper_context_manager():
+    with socket_listener(), recorder_context_manager(), dumper_context_manager(), pager_listener_context_manager():
         recorded_process = run_python_script("sockets.py", arguments)
         with timeout(seconds=3):
             _, stderr = recorded_process.communicate()
@@ -49,7 +52,8 @@ def test_sockets_record_and_replay_happy_flow(run_python_script, recorder_contex
 
     with replaying_context_manager():
         with timeout(seconds=30000):
-            replayed_process = run_python_script(script_name, arguments)
-            exit_code = run_replayer_on_records_at_path(replayed_process.pid, records_path)
-            _, stderr = replayed_process.communicate()
+            # replayed_process = run_python_script(script_name, arguments)
+            cpager.restore_from_snapshot(str(DUMP_DIRECTORY))
+            exit_code = run_replayer_on_records_at_path(recorded_process.pid, records_path)
+            # _, stderr = replayed_process.communicate()
     assert exit_code == 0, stderr

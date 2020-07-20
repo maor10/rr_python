@@ -9,52 +9,6 @@ from replayer import run_replayer
 from replayer.system_call_runners import SystemCallRunner
 
 
-class CompileException(Exception):
-    pass
-
-
-def get_output_path_for_binary_with_name(name):
-    return Path(f'/tmp/{name}.out')
-
-
-@pytest.fixture
-def compile_binary():
-    binary_name = None
-
-    def _compile_binary(name):
-        nonlocal binary_name
-        binary_name = name
-        test_binary_directory = Path(__file__).parent / 'test_binary'
-        success = os.system(f"gcc -o {get_output_path_for_binary_with_name(binary_name)} {test_binary_directory}/{binary_name}.c")
-        if success != 0:
-            raise CompileException()
-        os.system(f"chmod 777 {get_output_path_for_binary_with_name(binary_name)}")
-    yield _compile_binary
-
-    if binary_name:
-        output_path = get_output_path_for_binary_with_name(binary_name)
-        if output_path.exists():
-            output_path.unlink()
-
-    return _compile_binary
-
-
-@pytest.fixture
-def run_test_binary(compile_binary):
-    process = None
-
-    def _run_popen(binary_name, args):
-        nonlocal process
-        compile_binary(binary_name)
-        process = subprocess.Popen([str(get_output_path_for_binary_with_name(binary_name)), *args],
-                                   stderr=subprocess.PIPE)
-        return process
-
-    yield _run_popen
-    if process is not None and process.poll() is None:
-        process.terminate()
-
-
 @pytest.fixture
 def run_system_calls_on_binary(run_test_binary):
 

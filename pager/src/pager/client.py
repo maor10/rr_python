@@ -1,4 +1,5 @@
 import os
+import signal
 from multiprocessing.connection import Client as MultiProcessingClient
 import time
 from pager.consts import PORT
@@ -13,8 +14,8 @@ class Client:
         self.pid = pid
 
     @classmethod
-    def create(cls):
-        return cls(MultiProcessingClient(('localhost', PORT)), pid=os.getpid())
+    def create(cls, pid=None):
+        return cls(MultiProcessingClient(('localhost', PORT)), pid=pid or os.getpid())
 
     def send_request_to_take_snapshot(self):
         """
@@ -22,11 +23,11 @@ class Client:
         :return:
         """
         self.connection.send(self.pid)
-        try:
-            # TODO check if in replay mode
-            self.connection.recv()
-        except ConnectionResetError:
-            print("Connection reset error")
+        os.kill(self.pid, signal.SIGSTOP)
+
+
+def send_request_to_take_snapshot():
+    return Client.create().send_request_to_take_snapshot()
 
 
 if __name__ == '__main__':

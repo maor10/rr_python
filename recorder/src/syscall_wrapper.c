@@ -140,14 +140,7 @@ int init_syscall_wrappers(void) {
     );
 
     return 0;
-}
-
-int init_syscall_wrappers(void) {
-    IF_TRUE_CLEANUP(
-        0 > register_kretprobes(syscall_wrappers, sizeof(syscall_wrappers) / sizeof(struct kretprobe *)),
-        "Failed to init copy kprobe!"
-    );
-
+    
 cleanup:
     return -1;
 }

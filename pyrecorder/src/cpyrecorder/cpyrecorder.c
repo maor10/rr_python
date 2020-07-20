@@ -11,6 +11,7 @@
 #include <sys/wait.h>
 #include <signal.h>
 
+
 #include "utils.h"
 
 
@@ -24,6 +25,7 @@
 
 
 #define REPLAY_ENVIRONMENT_FILE_PATH "/tmp/replay"
+#define REPLAY_STOP_TYPE_FILE_PATH "/tmp/replay_"
 
 
 /**
@@ -42,7 +44,7 @@ PyFrameObject *stop_frame;
 /**
  * Stop type
  **/
-int stop_type;
+int stop_type = -1;
 
 
 /**
@@ -55,6 +57,7 @@ int fork_and_debug() {
   } else {
     // Wait to be woken up to continue
     kill(getpid(), SIGSTOP);
+    
   }
   return 0;
 }
@@ -81,8 +84,6 @@ int should_stop(PyFrameObject *frame) {
 
 // TODO: figure out what are these params
 int tracer(PyObject *obj, PyFrameObject *frame, int what, PyObject *obj2) {
-  int fork_and_debug_res;
-
   if (what == PyTrace_LINE) {
     if (should_stop(frame)) {
       return fork_and_debug();
@@ -95,27 +96,40 @@ int tracer(PyObject *obj, PyFrameObject *frame, int what, PyObject *obj2) {
 int in_replay_environment() {
   FILE *file = fopen(REPLAY_ENVIRONMENT_FILE_PATH, "r");
   if (file){
-        fclose(file);
-        return 1;
-    }
-    return 0;
+    fclose(file);
+    LOG("IN REPLAY ENV");
+    return 1;
+  }
+  LOG("NOT IN REPLAY ENV");
+  return 0;
 }
 
+
+void handler(int signum) //, siginfo_t *info, void *extra)
+{
+  LOG("GOT HERE!!!!");
+    // void *ptr_val = info->si_value.sival_ptr;
+    // int int_val = info->si_value.sival_int;
+    // printf("Child: Father, I am %d!\n",int_val);
+}
+
+
+int get_and_set_stop_type() {
+  char file_name = REPLAY_ENVIRONMENT_FILE_PATH;
+  FILE *file = fopen(REPLAY_ENVIRONMENT_FILE_PATH, "r");
+}
 
 static PyObject* record_or_replay(PyObject *self, PyObject *args) {
   PyThreadState *state;
   // check if replaying  
   // TODO: how to know??
   if (in_replay_environment()) {
-    signal(SIGINT, handle_sigint); 
     state = PyGILState_GetThisThreadState();
     // We need to check if c_traceobj is NULL, as Python will XDECREF it in PyEval_SetTrace, 
     // potentially creating a difference in the memory between record and replay when the garbage collector comes 
     RAISE_EXCEPTION_ON_TRUE (state->c_traceobj != NULL, "Trace obj is currently set! Replaying will potentially corrupt memory state :/");
     PyEval_SetTrace(tracer, NULL);
-    kill(getpid(), SIGSTOP);
   }
-
   Py_RETURN_NONE;
 }
 

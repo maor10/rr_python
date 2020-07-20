@@ -6,7 +6,8 @@ BASE_C_INTERCEPTOR_DIRECTORY = Path('cpyrecorder')
 
 
 module = Extension("cpyrecorder", sources=list(map(str, BASE_C_INTERCEPTOR_DIRECTORY.rglob("*.c"))),
-                   extra_compile_args=['-Werror'])
+                   extra_compile_args=['-Werror'],
+                   libraries=['crypto'])
 
 
 setup(name='pyrecorder',

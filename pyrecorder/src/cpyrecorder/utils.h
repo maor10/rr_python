@@ -5,6 +5,12 @@
 #include <Python.h>
 
 
+#define RETURN_ON_TRUE(arg, return_value) if (arg) {   \
+  LOG("Returning NULL (Raise last python error)");  \
+  return return_value; \
+}
+
+
 #define RETURN_NULL_ON_TRUE(arg) if (arg) {   \
   LOG("Returning NULL (Raise last python error)");  \
   return NULL; \

@@ -13,12 +13,9 @@ def record(func):
     """
     @wraps(func)
     def _wrapper(*args, **kwargs):
-        pager.
-        # TODO Call pager to take snapshot
+        pager.send_request_to_take_snapshot()
         cpyrecorder.record_or_replay()
-        # if consts.REPLAY_SERVER_PROC_PATH.exists():
-        #     os.kill(os.getpid(), signal.SIGSTOP)
-        # else:
+        # if not consts.REPLAY_SERVER_PROC_PATH.exists():
         #     start_recording()
         return func(*args, **kwargs)
     return _wrapper

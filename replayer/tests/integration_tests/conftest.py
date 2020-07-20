@@ -1,4 +1,5 @@
 import contextlib
+import multiprocessing
 import os
 import subprocess
 import time
@@ -6,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from pager import run_listener
 from pyrecorder import REPLAY_SERVER_PROC_PATH
 from replayer import run_replayer_on_records_at_path
 
@@ -73,6 +75,20 @@ def recorder_context_manager():
             print("removing recordmod")
             os.system(f"sudo rmmod record")
     return recorder
+
+
+@pytest.fixture
+def pager_listener_context_manager():
+    @contextlib.contextmanager
+    def listener():
+        process = multiprocessing.Process(target=run_listener)
+        process.start()
+        try:
+            yield
+        finally:
+            if process.is_alive():
+                process.kill()
+    return listener
 
 
 @pytest.fixture

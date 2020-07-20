@@ -4,7 +4,10 @@ import time
 
 from interruptingcow import timeout
 from flask import Flask
+
+from pager.consts import DUMP_DIRECTORY
 from replayer.replayer import run_replayer_on_records_at_path
+import cpager
 
 
 def run_flask_app():
@@ -29,10 +32,10 @@ def flask_app():
 
 
 def test_requests_happy_flow(run_python_script, recorder_context_manager, dumper_context_manager,
-                     scripts_path, replaying_context_manager, records_path):
+                     scripts_path, replaying_context_manager, records_path, pager_listener_context_manager):
     script_name = "make_requests.py"
 
-    with flask_app(), recorder_context_manager(), dumper_context_manager():
+    with flask_app(), recorder_context_manager(), dumper_context_manager(), pager_listener_context_manager():
         recorded_process = run_python_script(script_name, [])
         with timeout(seconds=3):
             _, stderr = recorded_process.communicate()
@@ -40,26 +43,32 @@ def test_requests_happy_flow(run_python_script, recorder_context_manager, dumper
 
     with timeout(seconds=1000):
         with replaying_context_manager():
-            replayed_process = run_python_script(script_name, [])
-            exit_code = run_replayer_on_records_at_path(replayed_process.pid, records_path)
-            _, stderr = replayed_process.communicate()
+            # replayed_process = run_python_script(script_name, [])
+            cpager.restore_from_snapshot(str(DUMP_DIRECTORY))
+            exit_code = run_replayer_on_records_at_path(recorded_process.pid, records_path)
         assert exit_code == 0, stderr
 
 
 def test_https_requests_happy_flow(run_python_script, recorder_context_manager, dumper_context_manager,
-                     scripts_path, replaying_context_manager, records_path):
+                     scripts_path, replaying_context_manager, records_path, pager_listener_context_manager):
     script_name = "https_requests.py"
 
-    with recorder_context_manager(), dumper_context_manager():
+    import os
+    import os
+    # os.environ['OPENSSL_ia32cap'] = '~4611686018427387920:~0'
+    # os.environ['OPENSSL_ia32cap'] = '~4611686018427387904:~0'
+
+    with recorder_context_manager(), dumper_context_manager(), pager_listener_context_manager():
         recorded_process = run_python_script(script_name, [])
         with timeout(seconds=3):
             recorded_stdout, stderr = recorded_process.communicate()
 
     with timeout(seconds=1000):
         with replaying_context_manager():
-            replayed_process = run_python_script(script_name, [])
-            exit_code = run_replayer_on_records_at_path(replayed_process.pid, records_path)
-            replayed_stdout, stderr = replayed_process.communicate()
+            cpager.restore_from_snapshot(str(DUMP_DIRECTORY))
+            # replayed_process = run_python_script(script_name, [])
+            exit_code = run_replayer_on_records_at_path(recorded_process.pid, records_path)
+            # replayed_stdout, stderr = replayed_process.communicate()
         assert exit_code == 0
         # assert recorded_stdout == replayed_stdout
 

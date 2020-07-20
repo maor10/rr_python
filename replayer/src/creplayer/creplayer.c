@@ -39,6 +39,12 @@ PyObject *is_supported_callback = NULL;
 PyObject *ran_syscall_validator = NULL;
 
 
+/** 
+ * Callback to get registers
+ **/
+PyObject *get_registers_values_callback = NULL;
+
+
 /**
  * Pid of process to replay
  **/ 
@@ -66,7 +72,7 @@ PyObject* simulate_syscall(int current_syscall_index, struct user_regs_struct re
 
   RAISE_EXCEPTION_WITH_ERRNO_ON_TRUE(ptrace(PTRACE_SYSCALL, pid_to_ptrace, 0, 0) == -1);
   waitpid(pid_to_ptrace, 0, WUNTRACED);
-
+  
   LOG("Simulating real sys call...");
 
   syscall_arg_list = Py_BuildValue(
@@ -115,7 +121,8 @@ PyObject* replay() {
   struct user_regs_struct regs;
   siginfo_t siginfo;
   int exit_code;
-  PyObject* is_supported_result_obj;
+  PyObject *is_supported_result_obj;
+  PyObject *register_values_obj;
   int current_syscall_index = 0;
 
   
@@ -129,15 +136,29 @@ PyObject* replay() {
     }
     RAISE_EXCEPTION_ON_TRUE(siginfo.si_signo == SIGSEGV, "Tracee segfaulted");
     
+
+
     RAISE_EXCEPTION_WITH_ERRNO_ON_TRUE(ptrace(PTRACE_SYSCALL, pid_to_ptrace, 0, 0) == -1);
     waitpid(pid_to_ptrace, 0, 0);
 
     RAISE_EXCEPTION_WITH_ERRNO_ON_TRUE(ptrace(PTRACE_GETREGS, pid_to_ptrace, 0, &regs) == -1);
 
     LOG("received syscall %lld", regs.orig_rax);
+    
 
-    is_supported_result_obj = PyObject_CallFunction(is_supported_callback, "(iK)", current_syscall_index, regs.orig_rax);
-    RETURN_NULL_ON_TRUE(is_supported_result_obj == NULL);
+    register_values_obj = PyObject_CallFunction(get_registers_values_callback,
+      "(iKKKKKKKKKKKKKKKKK)", current_syscall_index, regs.orig_rax, regs.rax, regs.rbx, regs.rcx, regs.rdx, 
+      regs.rbp, regs.rsp, regs.rsi, regs.rdi, regs.r8, regs.r9, regs.r10, regs.r11, regs.r12, regs.r13, regs.r14, regs.r15);
+    RETURN_NULL_ON_TRUE(NULL == register_values_obj);
+    RETURN_NULL_ON_TRUE(!PyArg_ParseTuple(register_values_obj, "KKKKKKKKKKKKKKKK", &regs.rax, &regs.rbx, &regs.rcx, &regs.rdx, 
+        &regs.rbp, &regs.rsp, &regs.rsi, &regs.rdi, &regs.r8, &regs.r9, &regs.r10, &regs.r11, &regs.r12, &regs.r13, &regs.r14, &regs.r15));
+
+    RAISE_EXCEPTION_WITH_ERRNO_ON_TRUE(ptrace(PTRACE_SETREGS, pid_to_ptrace, 0, &regs) == -1);
+
+    is_supported_result_obj = PyObject_CallFunction(is_supported_callback, "(iKKKKKKKKKKKKKKKKK)", current_syscall_index, regs.orig_rax, 
+    regs.rax, regs.rbx, regs.rcx, regs.rdx, 
+      regs.rbp, regs.rsp, regs.rsi, regs.rdi, regs.r8, regs.r9, regs.r10, regs.r11, regs.r12, regs.r13, regs.r14, regs.r15);
+    RETURN_NULL_ON_TRUE(NULL == is_supported_result_obj);
     Py_DECREF(is_supported_result_obj);
 
     if (!PyObject_IsTrue(is_supported_result_obj)) {
@@ -187,8 +208,37 @@ PyObject* write_buffer_to_tracee(long addr, char *buffer, int length) {
 }
 
 
+PyObject* read_from_tracee(long addr, char *buffer, int length) {
+  const int word_size = sizeof(long);
+
+  union char_word_u {
+          long val;
+          char chars[word_size];
+  } data;
+
+  while (length > 0) {
+    LOG("Reading.. (%i left)", length);
+    data.val = ptrace(PTRACE_PEEKTEXT, pid_to_ptrace, addr, 0);
+    RAISE_EXCEPTION_WITH_ERRNO_ON_TRUE(data.val == -1);
+    LOG("DID READ!!");
+    if (length < word_size) {
+      memcpy(buffer, data.chars, length);
+    } else {
+      memcpy(buffer, data.chars, word_size);
+    }
+    length -= word_size;
+    buffer += word_size;
+    addr += word_size;
+  }
+
+  LOG("RETURNING NONE");
+  Py_RETURN_NONE;
+}
+
+
 static PyObject* start_replay_with_pid_and_handlers(PyObject *self, PyObject *args) {
-  RETURN_NULL_ON_TRUE(!PyArg_ParseTuple(args, "iOOO", &pid_to_ptrace, &is_supported_callback,
+  RETURN_NULL_ON_TRUE(!PyArg_ParseTuple(args, "iOOOO", &pid_to_ptrace, &get_registers_values_callback,
+  &is_supported_callback,
   &ran_syscall_validator,
   &syscall_handler));
   RAISE_EXCEPTION_ON_TRUE(!PyCallable_Check(is_supported_callback), "Is supported callback must be callable");
@@ -208,12 +258,29 @@ static PyObject* set_memory_in_replayed_process(PyObject *self, PyObject *args) 
   RETURN_NULL_ON_TRUE(write_buffer_to_tracee(address, buffer, length) == NULL);
 
   return Py_BuildValue("");
-} 
+}
+
+
+static PyObject* get_memory_from_replayed_process(PyObject *self, PyObject *args) {
+  unsigned long long address;
+  int length;
+  char *buffer;
+
+  RETURN_NULL_ON_TRUE(!PyArg_ParseTuple(args, "Ki", &address, &length));
+
+  LOG("Length is %i", length);
+  buffer = malloc(length);
+  RETURN_NULL_ON_TRUE(read_from_tracee(address, buffer, length) == NULL);
+
+  LOG("FINISHED READING");
+  return Py_BuildValue("y#", buffer, length);
+}
 
 
 static PyMethodDef methods[]= {
 	{"start_replay_with_pid_and_handlers", (PyCFunction)start_replay_with_pid_and_handlers, METH_VARARGS, "(todo docs)"},
   {"set_memory_in_replayed_process", (PyCFunction)set_memory_in_replayed_process, METH_VARARGS, "(todo docs)"},
+  {"get_memory_from_replayed_process", (PyCFunction)get_memory_from_replayed_process, METH_VARARGS, "(todo docs)"},
 	{NULL, NULL, 0, 0}
 }; 
 

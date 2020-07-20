@@ -19,6 +19,8 @@ SYS_CALL_REGISTER = 'orig_ax'
 
 EXIT_GROUP_SYSCALL_NUM = 231
 
+WRITE_SYS_CALL_NUM = 1
+
 SYS_CALL_NAMES = {
     288: "accept4",
     43: "accept",

@@ -217,10 +217,8 @@ PyObject* read_from_tracee(long addr, char *buffer, int length) {
   } data;
 
   while (length > 0) {
-    LOG("Reading.. (%i left)", length);
     data.val = ptrace(PTRACE_PEEKTEXT, pid_to_ptrace, addr, 0);
     RAISE_EXCEPTION_WITH_ERRNO_ON_TRUE(data.val == -1);
-    LOG("DID READ!!");
     if (length < word_size) {
       memcpy(buffer, data.chars, length);
     } else {
@@ -231,7 +229,6 @@ PyObject* read_from_tracee(long addr, char *buffer, int length) {
     addr += word_size;
   }
 
-  LOG("RETURNING NONE");
   Py_RETURN_NONE;
 }
 
@@ -268,11 +265,9 @@ static PyObject* get_memory_from_replayed_process(PyObject *self, PyObject *args
 
   RETURN_NULL_ON_TRUE(!PyArg_ParseTuple(args, "Ki", &address, &length));
 
-  LOG("Length is %i", length);
   buffer = malloc(length);
   RETURN_NULL_ON_TRUE(read_from_tracee(address, buffer, length) == NULL);
 
-  LOG("FINISHED READING");
   return Py_BuildValue("y#", buffer, length);
 }
 

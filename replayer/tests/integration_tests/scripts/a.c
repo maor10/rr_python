@@ -3,7 +3,7 @@
 
 int main() {
 	char bytes[10] = {0};
-	int i = RAND_pseudo_bytes(bytes, 10);
+	int i = RAND_bytes(bytes, 10);
 	if (i == 0) {
 		printf("oh :/\n");
 	}

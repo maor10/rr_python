@@ -66,6 +66,7 @@ def test_https_requests_happy_flow(run_python_script, recorder_context_manager, 
     with timeout(seconds=1000):
         with replaying_context_manager():
             cpager.restore_from_snapshot(str(DUMP_DIRECTORY))
+            time.sleep(1)
             # replayed_process = run_python_script(script_name, [])
             exit_code = run_replayer_on_records_at_path(recorded_process.pid, records_path)
             # replayed_stdout, stderr = replayed_process.communicate()

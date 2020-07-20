@@ -116,6 +116,7 @@ def should_simulate_system_call(system_calls: List[SystemCall], system_call_inde
         open_system_call_definition.system_call_number: lambda *_: False, #_should_simulate_open_system_call,
         close_system_call_definition.system_call_number: lambda *_: False, #_should_simulate_close_system_call,
         MMAP_SYSTEM_CALL_NUMBER: lambda *_: False,
+        12: lambda *_: False,
         10: lambda *_: False,
         41: lambda *_: False
     }.get(system_call.num, lambda *_: True)

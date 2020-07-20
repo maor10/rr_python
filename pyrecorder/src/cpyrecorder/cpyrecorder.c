@@ -115,8 +115,9 @@ void handler(int signum) //, siginfo_t *info, void *extra)
 
 
 int get_and_set_stop_type() {
-  char file_name = REPLAY_ENVIRONMENT_FILE_PATH;
-  FILE *file = fopen(REPLAY_ENVIRONMENT_FILE_PATH, "r");
+//  char file_name = REPLAY_ENVIRONMENT_FILE_PATH;
+//  FILE *file = fopen(REPLAY_ENVIRONMENT_FILE_PATH, "r");
+return -1;
 }
 
 static PyObject* record_or_replay(PyObject *self, PyObject *args) {

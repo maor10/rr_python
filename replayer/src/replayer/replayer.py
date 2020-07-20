@@ -121,5 +121,4 @@ def run_replayer(pid: int, system_calls: List[SystemCall]):
 
 def run_replayer_on_records_at_path(pid: int, path: str):
     system_calls = Loader.from_path(path).load_system_calls()
-    import ipdb; ipdb.set_trace()
     return Replayer.from_pid_and_system_calls(pid, system_calls).start_replaying()

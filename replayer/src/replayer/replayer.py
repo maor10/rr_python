@@ -63,7 +63,7 @@ class Replayer:
         if sys_call_number not in [3, 5, 9, 10]:
             for k, v in register_values.items():
                 assert system_call.registers[k] == v, f"(In {system_call.name}) Unexpected for {k}, expected {system_call.registers[k]} got {v}"
-                
+
         return should_simulate_system_call(self.system_calls, system_call_index=sys_call_index)
 
     def get_register_values_before_syscall_callback(self, syscall_index, syscall_number, *registers):

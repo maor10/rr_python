@@ -8,8 +8,8 @@ import cpager
 import pytest
 from interruptingcow import timeout
 
+import pager
 from pager import run_listener
-from pager.consts import DUMP_DIRECTORY
 from pyrecorder import REPLAY_SERVER_PROC_PATH
 from replayer import run_replayer_on_records_at_path
 
@@ -132,7 +132,7 @@ def assert_record_and_replay(run_python_script, recorder_context_manager, dumper
 
         with replaying_context_manager():
             with timeout(seconds=3):
-                cpager.restore_from_snapshot(str(DUMP_DIRECTORY))
+                cpager.restore_from_snapshot(str(pager.BASE_DIRECTORY / str(recorded_process.pid)))
                 exit_code = run_replayer_on_records_at_path(recorded_process.pid, records_path,
                                                             stdout_callback=stdout_callback)
 

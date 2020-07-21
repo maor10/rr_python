@@ -5,7 +5,7 @@ from pathlib import Path
 import cpager
 from multiprocessing.connection import Listener as MultiProcessingListener
 import time
-from pager.consts import PORT, BASE_DIRECTORY, DUMP_DIRECTORY
+from pager.consts import PORT, BASE_DIRECTORY
 from pager.km_communicator import start_recording
 
 
@@ -31,12 +31,9 @@ class Listener:
             conn = self.listener.accept()
             pid = conn.recv()
 
-            # directory = self.base_directory / DUMP_DIRECTORY_NAME  #  str(pid)
-            DUMP_DIRECTORY.mkdir(exist_ok=True)
-            start = time.time()
-            cpager.take_snapshot(pid, str(DUMP_DIRECTORY))
-            end = time.time()
-            print(end - start)
+            directory = self.base_directory / str(pid)
+            directory.mkdir(exist_ok=True)
+            cpager.take_snapshot(pid, str(directory))
             start_recording(pid)
             os.kill(pid, signal.SIGCONT)
 

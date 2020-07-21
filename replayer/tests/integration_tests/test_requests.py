@@ -2,12 +2,7 @@ import contextlib
 import multiprocessing
 import time
 
-from interruptingcow import timeout
 from flask import Flask
-
-from pager.consts import DUMP_DIRECTORY
-from replayer.replayer import run_replayer_on_records_at_path
-import cpager
 
 
 def run_flask_app():

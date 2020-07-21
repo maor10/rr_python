@@ -278,8 +278,6 @@ static PyMethodDef methods[]= {
 }; 
 
 
-
-
 static struct PyModuleDef creplayerModule = {
 	PyModuleDef_HEAD_INIT,
 	"creplayer",

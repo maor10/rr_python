@@ -1,8 +1,0 @@
-setup.py
-ctest_ssl/test.c
-test_ssl/__init__.py
-test_ssl/main.py
-test_ssl.egg-info/PKG-INFO
-test_ssl.egg-info/SOURCES.txt
-test_ssl.egg-info/dependency_links.txt
-test_ssl.egg-info/top_level.txt

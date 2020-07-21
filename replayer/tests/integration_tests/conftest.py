@@ -4,10 +4,12 @@ import os
 import subprocess
 import time
 from pathlib import Path
-
+import cpager
 import pytest
+from interruptingcow import timeout
 
 from pager import run_listener
+from pager.consts import DUMP_DIRECTORY
 from pyrecorder import REPLAY_SERVER_PROC_PATH
 from replayer import run_replayer_on_records_at_path
 
@@ -39,7 +41,7 @@ def run_python_script(scripts_path):
     def _run_script(script_name, arguments=None):
         arguments = arguments or []
         process = subprocess.Popen(["python3", str(scripts_path / script_name), *arguments],
-                                   # stdout=subprocess.PIPE,
+                                   stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE,
                                    stdin=subprocess.PIPE)
         processes.append(process)
@@ -110,3 +112,34 @@ def replaying_context_manager():
                 REPLAY_SERVER_PROC_PATH.unlink()
     return replayer
 
+
+@pytest.fixture
+def assert_record_and_replay(run_python_script, recorder_context_manager, dumper_context_manager,
+                             replaying_context_manager,
+                             pager_listener_context_manager, scripts_path, records_path):
+    replayed_stdout = b''
+
+    def stdout_callback(text):
+        nonlocal replayed_stdout
+        replayed_stdout += text
+
+    def _run(script_name, runtime_arguments=None, print_stdouts=False):
+        with recorder_context_manager(), dumper_context_manager(), pager_listener_context_manager():
+            recorded_process = run_python_script(script_name, runtime_arguments or [])
+            with timeout(seconds=3):
+                recorded_stdout, stderr = recorded_process.communicate()
+            assert recorded_process.returncode == 0, f"Recorded process returned a non-zero exit code\nstderr: {stderr}"
+
+        with replaying_context_manager():
+            with timeout(seconds=3):
+                cpager.restore_from_snapshot(str(DUMP_DIRECTORY))
+                exit_code = run_replayer_on_records_at_path(recorded_process.pid, records_path,
+                                                            stdout_callback=stdout_callback)
+
+        if print_stdouts:
+            print(f"Recorded STDOUT: {recorded_stdout}")
+            print(f"Replayed STDOUT: {replayed_stdout}")
+        assert exit_code == 0, stderr
+        assert recorded_stdout == replayed_stdout
+
+    return _run

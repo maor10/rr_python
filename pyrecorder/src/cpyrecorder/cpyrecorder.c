@@ -97,10 +97,8 @@ int in_replay_environment() {
   FILE *file = fopen(REPLAY_ENVIRONMENT_FILE_PATH, "r");
   if (file){
     fclose(file);
-    LOG("IN REPLAY ENV");
     return 1;
   }
-  LOG("NOT IN REPLAY ENV");
   return 0;
 }
 

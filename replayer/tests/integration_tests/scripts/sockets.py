@@ -9,7 +9,7 @@ import time
 def connect_send_recv():
     host = sys.argv[1]
     port = int(sys.argv[2])
-    text = sys.argv[3].encode('utf-8')
+    text = b"hello der mate"
     s = socket.socket()
     start_time = time.time()
     while True:
@@ -17,11 +17,7 @@ def connect_send_recv():
             s.connect((host, port))
             s.send(text)
             received = s.recv(len(text))
-            if received != text:
-                # we don't do assert because on fail it makes system calls that cause invalidsyscall to appear,
-                # covering up the issue
-                print(f"received was {received}, expected {text}", file=sys.stderr)
-                exit(1)
+            print(received)
             break
         except socket.error:
             if time.time() - start_time > 1:

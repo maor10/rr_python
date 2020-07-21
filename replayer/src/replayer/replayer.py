@@ -1,6 +1,6 @@
-from typing import List
+from typing import List, Callable
 import creplayer
-from replayer import syscall_handlers
+from replayer import syscall_handlers, system_consts
 from replayer.system_consts import REGISTER_NAMES, SYS_CALL_REGISTER, SYS_CALL_NAMES, EXIT_GROUP_SYS_CALL, \
     WRITE_SYS_CALL
 from replayer.exceptions import NoSuchSysCallRunnerExistsException, NoSysCallsLeftException, UnexpectedSysCallException
@@ -12,20 +12,14 @@ from replayer.system_call_runners import SystemCallRunner, RegularSystemCallRunn
 
 class Replayer:
 
-    def __init__(self, pid: int, system_calls: List[SystemCall], print_writes_to_stdout=True):
+    def __init__(self, pid: int, system_calls: List[SystemCall], stdout_callback=None):
         self.pid = pid
         self.system_calls = system_calls
-        self.print_writes_to_stdout = print_writes_to_stdout
+        self.stdout_callback = stdout_callback
 
     @classmethod
-    def from_pid_and_system_calls(cls, pid: int, system_calls: List[SystemCall]):
-        # The first call in recording is to close the /proc/recording_process file conn,
-        # whereas this does not happen in replay. Therefore, a quick and dirty fix is to remove first close.
-        # TODO: Find a better fix!
-        # if system_calls and system_calls[0].registers[SYS_CALL_REGISTER] == 3:
-        #     system_calls.pop(0)
-
-        return cls(pid, system_calls)
+    def from_pid_and_system_calls(cls, pid: int, system_calls: List[SystemCall], stdout_callback=None):
+        return cls(pid, system_calls, stdout_callback)
 
     def ran_syscall_result_callback(self, sys_call_index: int, syscall_result: int):
         system_call = self.system_calls[sys_call_index]
@@ -61,10 +55,10 @@ class Replayer:
             print(f"{sys_call_index} / {len(self.system_calls)}")
             raise UnexpectedSysCallException(expected=system_call.num,
                                              received=sys_call_number)
-        #
-        # if sys_call_number not in [3, 5, 9, 10]:
-        #     for k, v in register_values.items():
-        #         assert system_call.registers[k] == v, f"(In {system_call.name}) Unexpected for {k}, expected {system_call.registers[k]} got {v}"
+
+        if sys_call_number not in [0, 3, 5, 9, 10]:
+            for k, v in register_values.items():
+                assert system_call.registers[k] == v, f"(In {system_call.name}) Unexpected for {k}, expected {system_call.registers[k]} got {v}"
 
         return should_simulate_system_call(self.system_calls, system_call_index=sys_call_index)
 
@@ -93,9 +87,11 @@ class Replayer:
         current_register_values = self._get_register_values(registers)
         system_call = self.system_calls[sys_call_index]
 
-        if self.print_writes_to_stdout and sys_call_number == WRITE_SYS_CALL and system_call.registers['rdi']:
-            output_text = creplayer.get_memory_from_replayed_process(system_call.registers['rsi'], system_call.registers['rdx'])
-            print(output_text)
+        # rdi 1 is fd stdout
+        if system_call.num == system_consts.WRITE_SYS_CALL and system_call.registers['rdi'] == 1 \
+                and self.stdout_callback is not None:
+            self.stdout_callback(creplayer.get_memory_from_replayed_process(system_call.registers['rsi'],
+                                                                            system_call.registers['rdx']))
 
         system_call_runner = RegularSystemCallRunner(sys_call_number, current_register_values, system_call)
         return system_call_runner.run()
@@ -115,17 +111,17 @@ class Replayer:
         }
 
 
-def run_replayer(pid: int, system_calls: List[SystemCall]):
+def run_replayer(pid: int, system_calls: List[SystemCall], stdout_callback: Callable):
     """
     Run the sys call interceptor on a given pid with given system calls responses
 
     :param pid: to run on
     :param system_calls: to give back to process
+    :param stdout_callback: to run on any print to stdout (mainly used for testing/debugging purposes)
     """
-    return Replayer.from_pid_and_system_calls(pid, system_calls).start_replaying()
+    return Replayer.from_pid_and_system_calls(pid, system_calls, stdout_callback).start_replaying()
 
 
-def run_replayer_on_records_at_path(pid: int, path: str):
+def run_replayer_on_records_at_path(pid: int, path: str, stdout_callback=None):
     system_calls = Loader.from_path(path).load_system_calls()
-    # import ipdb; ipdb.
-    return Replayer.from_pid_and_system_calls(pid, system_calls).start_replaying()
+    return run_replayer(pid, system_calls, stdout_callback)

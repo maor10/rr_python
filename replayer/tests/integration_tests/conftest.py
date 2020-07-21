@@ -15,7 +15,17 @@ from replayer import run_replayer_on_records_at_path
 
 DUMP_PATH = '/proc/syscall_dumper'
 
-KERNEL_MODULE_DIRECTORY = "/projects/stuffs/rr_python/recorder/src"
+# TODO: is there a better way to do this?? Maybe in install set env var..
+
+
+@pytest.fixture
+def kernel_module_directory():
+    directory = Path(__file__).parent
+    while directory.stem != "rr_python":
+        directory = directory.parent
+        if str(directory) == '/':
+            raise Exception("Could not find base project directory")
+    return directory / 'recorder' / 'src'
 
 
 @pytest.fixture(autouse=True)
@@ -71,12 +81,13 @@ def dumper_context_manager(records_path):
 
 
 @pytest.fixture
-def recorder_context_manager():
+def recorder_context_manager(kernel_module_directory):
     @contextlib.contextmanager
     def recorder():
         if REPLAY_SERVER_PROC_PATH.exists():
             REPLAY_SERVER_PROC_PATH.unlink()
-        os.system(f"sudo insmod {KERNEL_MODULE_DIRECTORY}/record.ko")
+        subprocess.check_output([f"insmod", f"{kernel_module_directory}/record.ko"],
+                                stderr=subprocess.STDOUT)
         try:
             yield
         finally:

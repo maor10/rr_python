@@ -13,5 +13,7 @@ setup(name='replayer',
       packages=find_packages(),
       ext_modules=[module],
       install_requires=[],
-      tests_require=['interruptingcow', 'requests', 'flask']
+      extras_require={
+            'tests': ['pytest', 'interruptingcow', 'requests', 'flask']
+      }
       )

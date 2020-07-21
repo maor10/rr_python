@@ -14,7 +14,9 @@ module = Extension("cpyrecorder", sources=list(map(str, BASE_C_INTERCEPTOR_DIREC
 setup(name='pyrecorder',
       version='1.0',
       packages=find_packages(),
-      install_requires=['ipdb', 'psutil', 'interruptingcow'],
-
+      install_requires=[],
+      extras_require={
+          'tests': ['pytest', 'ipdb', 'psutil', 'interruptingcow'],
+      },
       ext_modules=[module],
       )

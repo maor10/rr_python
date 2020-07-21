@@ -6,6 +6,7 @@ BASE_C_INTERCEPTOR_DIRECTORY = Path('cpyrecorder')
 
 
 module = Extension("cpyrecorder", sources=list(map(str, BASE_C_INTERCEPTOR_DIRECTORY.rglob("*.c"))),
+                   include_dirs=["/home/osboxes/openssl/include/"],
                    extra_compile_args=['-Werror'],
                    libraries=['crypto'])
 

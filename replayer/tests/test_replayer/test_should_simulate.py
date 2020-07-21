@@ -1,7 +1,7 @@
 import pytest
 
-from replayer.consts import SYS_CALL_REGISTER
-from replayer.should_simulate import MMAP_SYSTEM_CALL_NUMBER, should_simulate_system_call
+from replayer.system_consts import SYS_CALL_REGISTER, MMAP_SYS_CALL
+from replayer.should_simulate import should_simulate_system_call
 from replayer.system_call_runners.regular_system_call_runner.system_call_definitions.fs_system_call_definitions import \
     open_system_call_definition, close_system_call_definition
 from replayer.system_calls import SystemCall
@@ -23,7 +23,7 @@ def create_mmap_system_call_for_fd(fd: int) -> SystemCall:
     return SystemCall(
         memory_copies=[],
         registers={
-            SYS_CALL_REGISTER: MMAP_SYSTEM_CALL_NUMBER,
+            SYS_CALL_REGISTER: MMAP_SYS_CALL,
             'r8': fd
         },
         return_value=0
@@ -98,8 +98,3 @@ def create_close_call_for_fd(fd: int) -> SystemCall:
 def test_get_replayable_system_calls(name, system_calls, expected_should_simulates):
     for i, (system_call, expected_should_simulate) in enumerate(zip(system_calls, expected_should_simulates)):
         assert should_simulate_system_call(system_calls, i) == expected_should_simulate, f'failed "{name}" index {i}'
-
-
-def test_close_without_open_raises_exception():
-    with pytest.raises(CouldNotFindMatchingSyscallException):
-        should_simulate_system_call([create_close_call_for_fd(1)], 0)

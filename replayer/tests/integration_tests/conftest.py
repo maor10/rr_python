@@ -16,6 +16,12 @@ DUMP_PATH = '/proc/syscall_dumper'
 KERNEL_MODULE_DIRECTORY = "/projects/stuffs/rr_python/recorder/src"
 
 
+@pytest.fixture(autouse=True)
+def raise_if_not_root():
+    if os.getuid() != 0:
+        raise Exception("You must be root to run integration tests (for criu to work)")
+
+
 @pytest.fixture
 def records_path():
     return Path('/tmp/records.dump')

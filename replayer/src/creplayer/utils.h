@@ -28,11 +28,11 @@
 #define RETURN_PY_NONE_ON_TRUE(arg) if (arg) {   \
   Py_RETURN_NONE;   \
 }
-
+/*
 #define LOG(...) printf("%s:%i - ", __FILE__, __LINE__); \
     printf(__VA_ARGS__);  \
     printf("\n");
-
-// #define LOG(...) ;
+*/
+#define LOG(...) ;
 
 #endif

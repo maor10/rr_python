@@ -1,8 +1,8 @@
 from typing import List
 import creplayer
 from replayer import syscall_handlers
-from replayer.consts import REGISTER_NAMES, SYS_CALL_REGISTER, SYS_CALL_NAMES, EXIT_GROUP_SYSCALL_NUM, \
-    WRITE_SYS_CALL_NUM
+from replayer.system_consts import REGISTER_NAMES, SYS_CALL_REGISTER, SYS_CALL_NAMES, EXIT_GROUP_SYS_CALL, \
+    WRITE_SYS_CALL
 from replayer.exceptions import NoSuchSysCallRunnerExistsException, NoSysCallsLeftException, UnexpectedSysCallException
 from replayer.should_simulate import should_simulate_system_call
 from replayer.system_calls import SystemCall
@@ -33,7 +33,7 @@ class Replayer:
             raise Exception("Should not have gotten here")
         expected_return_value = system_call.return_value
         if syscall_result != expected_return_value:
-            if system_call.num not in [3, 257]:
+            if system_call.num not in [3, 41, 257]:
                 raise Exception(f"Unexpected syscall result {syscall_result}, expected {expected_return_value}")
 
     def has_supported_syscall_runner_for_system_call(self, sys_call_index: int, sys_call_number: int, *registers) -> bool:
@@ -48,7 +48,7 @@ class Replayer:
         """
         # we did not hit this in record and do hit this in replay; probably has to do with ptrace
         # TODO figure out if we need this
-        if sys_call_number == EXIT_GROUP_SYSCALL_NUM:
+        if sys_call_number == EXIT_GROUP_SYS_CALL:
             return False
 
         if sys_call_index >= len(self.system_calls):
@@ -69,7 +69,7 @@ class Replayer:
         return should_simulate_system_call(self.system_calls, system_call_index=sys_call_index)
 
     def get_register_values_before_syscall_callback(self, syscall_index, syscall_number, *registers):
-        if syscall_number == EXIT_GROUP_SYSCALL_NUM:
+        if syscall_number == EXIT_GROUP_SYS_CALL:
             return registers
         register_values = self._get_register_values(registers)
         recorded_system_call = self.system_calls[syscall_index]
@@ -93,7 +93,7 @@ class Replayer:
         current_register_values = self._get_register_values(registers)
         system_call = self.system_calls[sys_call_index]
 
-        if self.print_writes_to_stdout and sys_call_number == WRITE_SYS_CALL_NUM and system_call.registers['rdi']:
+        if self.print_writes_to_stdout and sys_call_number == WRITE_SYS_CALL and system_call.registers['rdi']:
             output_text = creplayer.get_memory_from_replayed_process(system_call.registers['rsi'], system_call.registers['rdx'])
             print(output_text)
 
@@ -127,10 +127,5 @@ def run_replayer(pid: int, system_calls: List[SystemCall]):
 
 def run_replayer_on_records_at_path(pid: int, path: str):
     system_calls = Loader.from_path(path).load_system_calls()
+    # import ipdb; ipdb.
     return Replayer.from_pid_and_system_calls(pid, system_calls).start_replaying()
-
-
-def get_digest_lines(text):
-    lines = text.split('\n')
-    non_replayer_lines = [l for l in lines if not l.startswith('creplayer')]
-    return [r.replace('b\'')[:-1] for r in non_replayer_lines]

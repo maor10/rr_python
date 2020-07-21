@@ -1,20 +1,22 @@
 from typing import List, Callable, Union
 
+from replayer import system_consts
 from replayer.system_calls.system_call import SystemCall
-from replayer.system_call_runners import SystemCallRunner
 from replayer.system_calls.exceptions import CouldNotFindMatchingSyscallException
-from replayer.system_call_runners.regular_system_call_runner.system_call_definitions.fs_system_call_definitions import open_system_call_definition, \
+from replayer.system_call_runners.regular_system_call_runner.system_call_definitions.fs_system_call_definitions \
+    import open_system_call_definition, \
     openat_system_call_definition, close_system_call_definition
 from replayer.system_call_runners.regular_system_call_runner.system_call_definitions.socket_system_call_definitions \
     import socket_system_call_definition
-
 
 FS_OPEN_SYSTEM_CALLS_DEFINITIONS = [open_system_call_definition, openat_system_call_definition,
                                     socket_system_call_definition]
 FS_OPEN_SYSTEM_CALL_NUMBERS = [open_system_call.system_call_number
                                for open_system_call in FS_OPEN_SYSTEM_CALLS_DEFINITIONS]
 
-MMAP_SYSTEM_CALL_NUMBER = 9
+
+SYS_CALLS_NOT_TO_SIMULATE = [system_consts.MMAP_SYS_CALL, system_consts.MPROTECT_SYS_CALL,
+                             system_consts.BRK_SYS_CALL, system_consts.MUNMAP_SYS_CALL]
 
 
 def _find_first_syscall_matching(system_calls, matcher_callback: Callable, raise_if_not_found=True) -> Union[None,
@@ -72,7 +74,7 @@ def _is_mmap_system_call_for_fd(system_call: SystemCall, fd: int):
     :param fd: fd to check if mmaping
     :return: whether or not it's a 'mmap' syscall on fd
     """
-    return system_call.num == MMAP_SYSTEM_CALL_NUMBER and system_call.registers['r8'] == fd
+    return system_call.num == system_consts.MMAP_SYS_CALL and system_call.registers['r8'] == fd
 
 
 def _fd_appears_in_mmap_before_close(fd: int, system_calls: List[SystemCall], system_call_index: int):
@@ -80,7 +82,7 @@ def _fd_appears_in_mmap_before_close(fd: int, system_calls: List[SystemCall], sy
                                                matcher_callback=lambda s: (_is_close_system_call_for_fd(s, fd)
                                                                           or _is_mmap_system_call_for_fd(s, fd)),
                                                raise_if_not_found=False)
-    return system_call is not None and system_call.num == MMAP_SYSTEM_CALL_NUMBER
+    return system_call is not None and system_call.num == system_consts.MMAP_SYS_CALL
 
 
 def _mmap_appears_after_open_for_fd(fd: int, system_calls: List[SystemCall], system_call_index: int):
@@ -88,7 +90,7 @@ def _mmap_appears_after_open_for_fd(fd: int, system_calls: List[SystemCall], sys
                                                matcher_callback=lambda s: (_is_open_system_call_for_fd(s, fd)
                                                                            or _is_mmap_system_call_for_fd(s, fd)),
                                                raise_if_not_found=False)
-    return system_call is not None and system_call.num == MMAP_SYSTEM_CALL_NUMBER
+    return system_call is not None and system_call.num == system_consts.MMAP_SYS_CALL
 
 
 def _should_simulate_open_system_call(system_calls, system_call, system_call_index):
@@ -98,6 +100,17 @@ def _should_simulate_open_system_call(system_calls, system_call, system_call_ind
 def _should_simulate_close_system_call(system_calls, system_call, system_call_index):
     return not _mmap_appears_after_open_for_fd(system_call.registers['rdi'],  # rdi is register of the fd for close
                                                system_calls, system_call_index)
+
+
+HANDLERS = {
+    openat_system_call_definition.system_call_number: _should_simulate_open_system_call,
+    open_system_call_definition.system_call_number: _should_simulate_open_system_call,
+    close_system_call_definition.system_call_number: _should_simulate_close_system_call,
+    **{
+        sys_call: lambda *_: False
+        for sys_call in SYS_CALLS_NOT_TO_SIMULATE
+    }
+}
 
 
 def should_simulate_system_call(system_calls: List[SystemCall], system_call_index: int) -> bool:
@@ -111,13 +124,5 @@ def should_simulate_system_call(system_calls: List[SystemCall], system_call_inde
     :return: whether it should be simulated
     """
     system_call = system_calls[system_call_index]
-    handler = {
-        openat_system_call_definition.system_call_number: lambda *_: False, #_should_simulate_open_system_call,
-        open_system_call_definition.system_call_number: lambda *_: False, #_should_simulate_open_system_call,
-        close_system_call_definition.system_call_number: lambda *_: False, #_should_simulate_close_system_call,
-        MMAP_SYSTEM_CALL_NUMBER: lambda *_: False,
-        12: lambda *_: False,
-        10: lambda *_: False,
-        41: lambda *_: False
-    }.get(system_call.num, lambda *_: True)
+    handler = HANDLERS.get(system_call.num, lambda *_: True)
     return handler(system_calls, system_call, system_call_index)

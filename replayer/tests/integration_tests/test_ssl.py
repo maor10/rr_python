@@ -8,14 +8,11 @@ def test_ssl_happy_flow(run_python_script, recorder_context_manager, dumper_cont
                      scripts_path, replaying_context_manager, records_path, pager_listener_context_manager):
     script_name = "ssl_test.py"
 
-    #
-    # import os
-    # os.environ['OPENSSL_ia32cap'] = f'~{env_var}:~0'
-
     with recorder_context_manager(), dumper_context_manager(), pager_listener_context_manager():
         recorded_process = run_python_script(script_name, [])
         with timeout(seconds=3):
             recorded_stdout, stderr = recorded_process.communicate()
+            print(stderr)
             print(recorded_stdout)
 
     with timeout(seconds=1000):

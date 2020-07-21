@@ -232,7 +232,6 @@ PyObject* read_from_tracee(long addr, char *buffer, int length) {
   Py_RETURN_NONE;
 }
 
-
 static PyObject* start_replay_with_pid_and_handlers(PyObject *self, PyObject *args) {
   RETURN_NULL_ON_TRUE(!PyArg_ParseTuple(args, "iOOOO", &pid_to_ptrace, &get_registers_values_callback,
   &is_supported_callback,
@@ -271,13 +270,14 @@ static PyObject* get_memory_from_replayed_process(PyObject *self, PyObject *args
   return Py_BuildValue("y#", buffer, length);
 }
 
-
 static PyMethodDef methods[]= {
 	{"start_replay_with_pid_and_handlers", (PyCFunction)start_replay_with_pid_and_handlers, METH_VARARGS, "(todo docs)"},
   {"set_memory_in_replayed_process", (PyCFunction)set_memory_in_replayed_process, METH_VARARGS, "(todo docs)"},
   {"get_memory_from_replayed_process", (PyCFunction)get_memory_from_replayed_process, METH_VARARGS, "(todo docs)"},
 	{NULL, NULL, 0, 0}
 }; 
+
+
 
 
 static struct PyModuleDef creplayerModule = {

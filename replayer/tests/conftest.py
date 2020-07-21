@@ -39,12 +39,12 @@ def compile_binary():
 def run_test_binary(compile_binary):
     process = None
 
-    def _run_popen(directory, binary_name, compile_args=None, args=None):
+    def _run_popen(directory, binary_name, compile_args=None, runtime_args=None):
         nonlocal process
         compile_args = compile_args or []
-        args = args or []
-        # compile_binary(directory, binary_name, compile_args=compile_args)
-        process = subprocess.Popen([str(get_output_path_for_binary_with_name(binary_name)), *args],
+        runtime_args = runtime_args or []
+        compile_binary(directory, binary_name, compile_args=compile_args)
+        process = subprocess.Popen([str(get_output_path_for_binary_with_name(binary_name)), *runtime_args],
                                    stderr=subprocess.PIPE)
         return process
 

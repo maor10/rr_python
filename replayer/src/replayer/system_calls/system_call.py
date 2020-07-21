@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import List, Dict
 
-from replayer.consts import SYS_CALL_REGISTER
+from replayer.system_consts import SYS_CALL_REGISTER
 from replayer.system_calls.memory_copy import MemoryCopy
 from replayer.utils import get_syscall_name_from_syscall_num
 

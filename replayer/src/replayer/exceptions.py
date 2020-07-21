@@ -1,4 +1,4 @@
-from .consts import SYS_CALL_NAMES
+from .system_consts import SYS_CALL_NAMES
 
 
 class ReplayerException(Exception):

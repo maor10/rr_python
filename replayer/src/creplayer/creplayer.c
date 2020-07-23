@@ -186,12 +186,15 @@ static PyObject* py_read_from_tracee(PyObject *self, PyObject *args) {
   unsigned long long address;
   int length;
   char *buffer;
+  PyObject *res;
 
   RETURN_NULL_ON_TRUE(!PyArg_ParseTuple(args, "iKi", &pid, &address, &length));
   buffer = malloc(length);
   RETURN_NULL_ON_TRUE(read_from_tracee(pid, address, buffer, length) == NULL);
 
-  return Py_BuildValue("y#", buffer, length);
+  res = Py_BuildValue("y#", buffer, length);
+  free(buffer);
+  return res;
 }
 
 static PyMethodDef methods[]= {

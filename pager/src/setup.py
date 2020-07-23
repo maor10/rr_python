@@ -16,9 +16,4 @@ setup(name='pager',
           extension
       ],
       install_requires=['click', 'memory-tempfile', 'interruptingcow'],
-      entry_points={
-          'console_scripts': [
-              'maor_pager = pager.cli:cli',
-          ],
-      }
       )

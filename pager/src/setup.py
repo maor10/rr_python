@@ -6,9 +6,8 @@ from setuptools import setup, find_packages, Extension
 BASE_C_SOURCES_DIRECTORY = Path(__file__).resolve().parent / Path('cpager')
 extension = Extension("cpager",
                       sources=[str(BASE_C_SOURCES_DIRECTORY / "cpager.c")],
-                      include_dirs=[str(BASE_C_SOURCES_DIRECTORY / Path('libs'))],
-                      extra_objects=[str(BASE_C_SOURCES_DIRECTORY / "libs" / "libcriu.a")],
-                      libraries=['protobuf-c'])
+                      extra_compile_args=['-L/usr/lib/x86_64-linux-gnu/'],
+                      libraries=['protobuf-c', 'criu'])
 
 setup(name='pager',
       version='1.0',

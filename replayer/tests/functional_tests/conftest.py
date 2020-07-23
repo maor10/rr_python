@@ -20,8 +20,7 @@ def compile_binary():
         nonlocal binary_name
         binary_name = name
         compile_args = compile_args or []
-        print(f"gcc -o {get_output_path_for_binary_with_name(binary_name)} {directory}/{binary_name}.c {' '.join(compile_args)}")
-        success = os.system(f"gcc -o {get_output_path_for_binary_with_name(binary_name)} {directory}/{binary_name}.c {' '.join(compile_args)}")
+        success = os.system(f"gcc -o {get_output_path_for_binary_with_name(binary_name)} {directory}/{binary_name} {' '.join(compile_args)}")
         if success != 0:
             raise CompileException()
         os.system(f"chmod 777 {get_output_path_for_binary_with_name(binary_name)}")
@@ -45,6 +44,8 @@ def run_test_binary(compile_binary):
         runtime_args = runtime_args or []
         compile_binary(directory, binary_name, compile_args=compile_args)
         process = subprocess.Popen([str(get_output_path_for_binary_with_name(binary_name)), *runtime_args],
+                                   stdout=subprocess.PIPE,
+                                   stdin=subprocess.PIPE,
                                    stderr=subprocess.PIPE)
         return process
 

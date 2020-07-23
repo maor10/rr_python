@@ -1,9 +1,10 @@
-from typing import Dict, List, Generator
+from typing import Dict, List
 
-from ..system_call import SystemCall
-from replayer.system_calls.loader.consts import REGISTER_NAMES_IN_PROTOCOL_ORDER
-from replayer.system_calls.memory_copy import MemoryCopy
-from replayer.system_calls.loader.unpacker import BinaryUnpacker
+from replayer.loader.system_call import SystemCall
+from .consts import REGISTER_NAMES_IN_PROTOCOL_ORDER
+from replayer.loader.memory_copy import MemoryCopy
+from .registers import Registers
+from .unpacker import BinaryUnpacker
 
 
 class Loader:
@@ -35,11 +36,8 @@ class Loader:
         number_of_copies = self.binary_unpacker.unpack_unsigned_long()
         return [self.load_memory_copy() for _ in range(number_of_copies)]
 
-    def load_register_values(self) -> Dict:
-        return {
-            register_name: self.binary_unpacker.unpack_unsigned_long()
-            for register_name in REGISTER_NAMES_IN_PROTOCOL_ORDER
-        }
+    def load_register_values(self) -> Registers:
+        return Registers(*[self.binary_unpacker.unpack_unsigned_long() for _ in Registers.__annotations__])
 
     def load_system_call(self) -> SystemCall:
         registers = self.load_register_values()

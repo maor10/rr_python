@@ -19,7 +19,7 @@
 
 
 #define RAISE_EXCEPTION_WITH_ERRNO_ON_TRUE(arg) if (arg) {   \
-  PyErr_Format(PyExc_ValueError, "%s", strerror(errno)); \
+  PyErr_Format(PyExc_SystemError, "%s", strerror(errno)); \
   LOG("Raising exception with errno");  \
   return NULL; \
 }
@@ -33,7 +33,6 @@
 #define LOG(...) printf("%s:%i - ", __FILE__, __LINE__); \
     printf(__VA_ARGS__);  \
     printf("\n");
-*/
 #else
 #define LOG(...) ;
 #endif

@@ -1,114 +1,161 @@
-from typing import List, Callable
+from typing import List, Callable, Dict
 import creplayer
 from replayer import syscall_handlers, system_consts
-from replayer.system_consts import REGISTER_NAMES, SYS_CALL_REGISTER, SYS_CALL_NAMES, EXIT_GROUP_SYS_CALL, \
-    WRITE_SYS_CALL
-from replayer.exceptions import NoSuchSysCallRunnerExistsException, NoSysCallsLeftException, UnexpectedSysCallException
+from replayer.system_consts import REGISTER_NAMES, EXIT_GROUP_SYS_CALL
+from .exceptions import UnexpectedSysCallException, UnexpectedRegistersException, \
+    UnexpectedSystemCallReturnValueException
 from replayer.should_simulate import should_simulate_system_call
-from replayer.system_calls import SystemCall
-from replayer.system_calls.loader.system_call_loader import Loader
-from replayer.system_call_runners import SystemCallRunner, RegularSystemCallRunner
+from replayer.loader import SystemCall
+from replayer.loader.system_call_loader import Loader
+from replayer.tracing_exceptions import SegfaultException
+from .loader.registers import Registers
+
+
+# TODO: remove temporary hack which ignores validating certain sys calls because one of their registers is
+# an fd that could be different in record and replay
+SYS_CALLS_TO_IGNORE_IN_VALIDATION = [system_consts.READ_SYS_CALL, system_consts.CLOSE_SYS_CALL,
+                                     system_consts.FSTAT_SYS_CALL, system_consts.MMAP_SYS_CALL,
+                                     system_consts.MPROTECT_SYS_CALL, system_consts.OPENAT_SYS_CALL]
 
 
 class Replayer:
+    """
+    Manages replaying a recording in a given process.
+    The replayer attaches to a given process and places it in a "sandbox" whereby any access to
+    outside resources will be either wrapped or simulated, in order to create the same exact execution described by the
+    recording
+    """
 
     def __init__(self, pid: int, system_calls: List[SystemCall], stdout_callback=None):
         self.pid = pid
         self.system_calls = system_calls
         self.stdout_callback = stdout_callback
 
-    @classmethod
-    def from_pid_and_system_calls(cls, pid: int, system_calls: List[SystemCall], stdout_callback=None):
-        return cls(pid, system_calls, stdout_callback)
-
-    def ran_syscall_result_callback(self, sys_call_index: int, syscall_result: int):
-        system_call = self.system_calls[sys_call_index]
-        if should_simulate_system_call(self.system_calls, sys_call_index):
-            raise Exception("Should not have gotten here")
-        expected_return_value = system_call.return_value
-        if syscall_result != expected_return_value:
-            if system_call.num not in [3, 41, 257]:
-                raise Exception(f"Unexpected syscall result {syscall_result}, expected {expected_return_value}")
-
-    def has_supported_syscall_runner_for_system_call(self, sys_call_index: int, sys_call_number: int, *registers) -> bool:
-        """
-        Callback for a booleanic question of whether a sys call number at a syscall index is supported
-
-        :param sys_call_index: at what index should the sys call number be checked if supported
-        :param sys_call_number: to check if supported
-        :return: whether or not it's supported
-
-        :raises UnexpectedSysCallException if a request for a sys call came that was out of context
-        """
-        # we did not hit this in record and do hit this in replay; probably has to do with ptrace
-        # TODO figure out if we need this
-        if sys_call_number == EXIT_GROUP_SYS_CALL:
-            return False
-
-        if sys_call_index >= len(self.system_calls):
-            raise NoSysCallsLeftException()
-
-        system_call = self.system_calls[sys_call_index]
-        register_values = self._get_register_values(registers)
-
-        if system_call.num != sys_call_number:
-            print(f"{sys_call_index} / {len(self.system_calls)}")
-            raise UnexpectedSysCallException(expected=system_call.num,
-                                             received=sys_call_number)
-
-        if sys_call_number not in [0, 3, 5, 9, 10]:
-            for k, v in register_values.items():
-                assert system_call.registers[k] == v, f"(In {system_call.name}) Unexpected for {k}, expected {system_call.registers[k]} got {v}"
-
-        return should_simulate_system_call(self.system_calls, system_call_index=sys_call_index)
-
-    def get_register_values_before_syscall_callback(self, syscall_index, syscall_number, *registers):
-        if syscall_number == EXIT_GROUP_SYS_CALL:
-            return registers
-        register_values = self._get_register_values(registers)
-        recorded_system_call = self.system_calls[syscall_index]
-        handler = syscall_handlers.HANDLERS.get(syscall_number)
-        new_register_values = handler(recorded_system_call, register_values) if handler else register_values
-        return tuple(new_register_values.values())
-
-    def simulate_system_call_handler(self, sys_call_index: int, sys_call_number: int = None, *registers) -> int:
-        """
-        Handles simulation of a given system call made by the replayed process
-        Only system calls that passed has_supported_... should be simulated with this handler
-
-        :param sys_call_index: system call index (# of syscall)
-        :param sys_call_number: to simulate
-        :param registers: the current registers of the replayed process
-        :return: system call result
-        """
-        if sys_call_index >= len(self.system_calls):
-            raise NoSysCallsLeftException()
-
-        current_register_values = self._get_register_values(registers)
-        system_call = self.system_calls[sys_call_index]
-
-        # rdi 1 is fd stdout
-        if system_call.num == system_consts.WRITE_SYS_CALL and system_call.registers['rdi'] == 1 \
-                and self.stdout_callback is not None:
-            self.stdout_callback(creplayer.get_memory_from_replayed_process(system_call.registers['rsi'],
-                                                                            system_call.registers['rdx']))
-
-        system_call_runner = RegularSystemCallRunner(sys_call_number, current_register_values, system_call)
-        return system_call_runner.run()
-
-    def start_replaying(self):
-        return creplayer.start_replay_with_pid_and_handlers(self.pid,
-                                                            self.get_register_values_before_syscall_callback,
-                                                            self.has_supported_syscall_runner_for_system_call,
-                                                            self.ran_syscall_result_callback,
-                                                            self.simulate_system_call_handler)
+    @staticmethod
+    def get_new_register_values_for_system_call(recorded_system_call: SystemCall, registers: Registers) \
+            -> Registers:
+        handler = syscall_handlers.HANDLERS.get(recorded_system_call.num)
+        new_register_values = handler(recorded_system_call, registers) if handler else registers
+        return new_register_values
 
     @staticmethod
-    def _get_register_values(registers):
-        return {
-            register_name: register
-            for (register_name, register) in zip(REGISTER_NAMES, registers)
-        }
+    def raise_on_unexpected_state(recorded_system_call: SystemCall, tracee_registers: Registers):
+        if recorded_system_call.registers != tracee_registers \
+                and recorded_system_call.num not in SYS_CALLS_TO_IGNORE_IN_VALIDATION:
+            raise UnexpectedRegistersException(expected=recorded_system_call.registers,
+                                               received=tracee_registers)
+        if recorded_system_call.num != tracee_registers.sys_call:
+            raise UnexpectedSysCallException(expected=recorded_system_call.num,
+                                             received=tracee_registers.sys_call)
+
+    @staticmethod
+    def raise_on_unexpected_return_value(recorded_system_call: SystemCall, tracee_registers: Registers):
+        if recorded_system_call.return_value != tracee_registers.rax \
+                and recorded_system_call.num not in SYS_CALLS_TO_IGNORE_IN_VALIDATION:
+            raise UnexpectedSystemCallReturnValueException(expected=recorded_system_call.return_value,
+                                                           received=tracee_registers.rax)
+
+    def _get_registers_from_tracee(self):
+        registers_list = creplayer.get_registers_from_tracee(self.pid)
+        return Registers(*registers_list)
+
+    def copy_memory_copies_to_tracee(self, recorded_system_call: SystemCall):
+        """
+        Copy all the memory copies of a given system call to the tracee
+        """
+        for memory_copy in recorded_system_call.memory_copies:
+            creplayer.write_to_tracee(self.pid, memory_copy.to_address, memory_copy.buffer)
+
+    def call_stdout_callback_if_relevant(self, recorded_system_call: SystemCall):
+        # rdi 1 is fd stdout
+        if recorded_system_call.num == system_consts.WRITE_SYS_CALL and recorded_system_call.registers.rdi == 1 \
+                and self.stdout_callback is not None:
+            self.stdout_callback(creplayer.read_from_tracee(self.pid,
+                                                            recorded_system_call.registers.rsi,
+                                                            recorded_system_call.registers.rdx))
+
+    def raise_on_tracee_segfault(self):
+        if creplayer.did_segfault(self.pid):
+            raise SegfaultException()
+
+    def get_exit_status(self) -> int:
+        """
+        Get the tracees exit status
+        """
+        creplayer.run_until_enter_or_exit_of_next_syscall(self.pid)
+        registers = self._get_registers_from_tracee()
+        if registers.sys_call is not EXIT_GROUP_SYS_CALL:
+            raise UnexpectedSysCallException(
+                expected=EXIT_GROUP_SYS_CALL,
+                received=registers.sys_call
+            )
+        creplayer.run_until_enter_or_exit_of_next_syscall(self.pid)
+        return registers.rdi
+
+    def simulate_system_call_for_tracee(self, recorded_system_call: SystemCall, tracee_registers: Registers):
+        """
+        Simulate the system call for the tracee. Recreate the behaviour the original system call did.
+
+        :param recorded_system_call: to recreate in tracee
+        :param tracee_registers: current tracee registers
+        """
+        # run an invalid syscall
+        registers_for_invalid_sys_call = tracee_registers.copy()
+        registers_for_invalid_sys_call.orig_rax = -5
+        creplayer.set_registers_in_tracee(self.pid, *registers_for_invalid_sys_call.to_list())
+        creplayer.run_until_enter_or_exit_of_next_syscall(self.pid)
+        self.copy_memory_copies_to_tracee(recorded_system_call)
+        new_registers = tracee_registers.copy()
+        new_registers.rax = recorded_system_call.return_value
+        creplayer.set_registers_in_tracee(self.pid, *new_registers.to_list())
+
+    def wrap_and_run_real_system_call_in_tracee(self, recorded_system_call: SystemCall, tracee_registers: Registers):
+        """
+        Run real system call (no simulation) in tracee. We do this in situations where it is not possible to
+        simulate the requested system call, but wrap it in order for the same behaviour to occur as in the recording
+        from the tracee's point of view.
+
+        For example, we cannot simulate MMAP appropriately, but we wrap it so that the mapped addresses will be the
+        same as in the recording
+
+        :param recorded_system_call: the equivalent system call in the recording
+        :param tracee_registers: current tracee registers
+        """
+        new_registers = self.get_new_register_values_for_system_call(recorded_system_call, tracee_registers)
+        creplayer.set_registers_in_tracee(self.pid, *new_registers.to_list())
+        creplayer.run_until_enter_or_exit_of_next_syscall(self.pid)
+        self.raise_on_unexpected_return_value(recorded_system_call, self._get_registers_from_tracee())
+
+    def run_tracee_through_system_call(self, recorded_system_call: SystemCall, recorded_system_call_index: int):
+        """
+        Run a system call for tracee, wrapping/simulating the actual system call the tracee is requesting to do
+        with the given recorded system call
+
+        :param recorded_system_call: from original recording
+        :param recorded_system_call_index: index of the system call (this is necessary in order to understand if a
+        given system call should be simulated or not)
+        """
+        registers = self._get_registers_from_tracee()
+        self.raise_on_unexpected_state(recorded_system_call, registers)
+        self.call_stdout_callback_if_relevant(recorded_system_call)
+        if should_simulate_system_call(self.system_calls, system_call_index=recorded_system_call_index):
+            self.simulate_system_call_for_tracee(recorded_system_call, registers)
+        else:
+            self.wrap_and_run_real_system_call_in_tracee(recorded_system_call, registers)
+
+    def start_replaying(self) -> int:
+        """
+        Entry point method to start replaying. Will attach to the process and run it within a sandbox,
+        recreating the exact same execution as in the recording.
+
+        :return: tracee exit status
+        """
+        creplayer.attach_to_tracee_and_begin(self.pid)
+        for i, recorded_system_call in enumerate(self.system_calls):
+            self.raise_on_tracee_segfault()
+            creplayer.run_until_enter_or_exit_of_next_syscall(self.pid)
+            self.run_tracee_through_system_call(recorded_system_call, i)
+        return self.get_exit_status()
 
 
 def run_replayer(pid: int, system_calls: List[SystemCall], stdout_callback: Callable):
@@ -119,9 +166,16 @@ def run_replayer(pid: int, system_calls: List[SystemCall], stdout_callback: Call
     :param system_calls: to give back to process
     :param stdout_callback: to run on any print to stdout (mainly used for testing/debugging purposes)
     """
-    return Replayer.from_pid_and_system_calls(pid, system_calls, stdout_callback).start_replaying()
+    return Replayer(pid, system_calls, stdout_callback).start_replaying()
 
 
 def run_replayer_on_records_at_path(pid: int, path: str, stdout_callback=None):
+    """
+    Run the sys call interceptor on a given pid with a path to a recording
+
+    :param pid: to run on
+    :param path: of recordings
+    :param stdout_callback: to run on any print to stdout (mainly used for testing/debugging purposes)
+    """
     system_calls = Loader.from_path(path).load_system_calls()
     return run_replayer(pid, system_calls, stdout_callback)

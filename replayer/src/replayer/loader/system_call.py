@@ -2,20 +2,21 @@ from dataclasses import dataclass
 from typing import List, Dict
 
 from replayer.system_consts import SYS_CALL_REGISTER
-from replayer.system_calls.memory_copy import MemoryCopy
+from .memory_copy import MemoryCopy
 from replayer.utils import get_syscall_name_from_syscall_num
+from .registers import Registers
 
 
 @dataclass
 class SystemCall:
 
-    registers: Dict[str, int]
+    registers: Registers
     return_value: int
     memory_copies: List[MemoryCopy]
 
     @property
     def num(self) -> int:
-        return self.registers[SYS_CALL_REGISTER]
+        return self.registers.sys_call
 
     @property
     def name(self) -> int:

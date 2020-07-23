@@ -1,20 +1,14 @@
 import pytest
-
-from replayer.system_consts import SYS_CALL_REGISTER, MMAP_SYS_CALL
+import mock
+from replayer import system_consts
+from replayer.loader import SystemCall
 from replayer.should_simulate import should_simulate_system_call
-from replayer.system_call_runners.regular_system_call_runner.system_call_definitions.fs_system_call_definitions import \
-    open_system_call_definition, close_system_call_definition
-from replayer.system_calls import SystemCall
-
-from replayer.system_calls.exceptions import CouldNotFindMatchingSyscallException
 
 
 def create_open_system_call_for_fd(fd: int) -> SystemCall:
     return SystemCall(
         memory_copies=[],
-        registers={
-            SYS_CALL_REGISTER: open_system_call_definition.system_call_number
-        },
+        registers=mock.Mock(sys_call=system_consts.OPEN_SYS_CALL),
         return_value=fd
     )
 
@@ -22,10 +16,7 @@ def create_open_system_call_for_fd(fd: int) -> SystemCall:
 def create_mmap_system_call_for_fd(fd: int) -> SystemCall:
     return SystemCall(
         memory_copies=[],
-        registers={
-            SYS_CALL_REGISTER: MMAP_SYS_CALL,
-            'r8': fd
-        },
+        registers=mock.Mock(sys_call=system_consts.MMAP_SYS_CALL, r8=fd),
         return_value=0
     )
 
@@ -33,10 +24,7 @@ def create_mmap_system_call_for_fd(fd: int) -> SystemCall:
 def create_close_call_for_fd(fd: int) -> SystemCall:
     return SystemCall(
         memory_copies=[],
-        registers={
-            SYS_CALL_REGISTER: close_system_call_definition.system_call_number,
-            'rdi': fd
-        },
+        registers=mock.Mock(sys_call=system_consts.CLOSE_SYS_CALL, rdi=fd),
         return_value=0
     )
 

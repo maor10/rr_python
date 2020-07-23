@@ -1,18 +1,12 @@
 from typing import List, Callable, Union
 
 from replayer import system_consts
-from replayer.system_calls.system_call import SystemCall
-from replayer.system_calls.exceptions import CouldNotFindMatchingSyscallException
-from replayer.system_call_runners.regular_system_call_runner.system_call_definitions.fs_system_call_definitions \
-    import open_system_call_definition, \
-    openat_system_call_definition, close_system_call_definition
-from replayer.system_call_runners.regular_system_call_runner.system_call_definitions.socket_system_call_definitions \
-    import socket_system_call_definition
+from replayer.loader.system_call import SystemCall
+from .exceptions import CouldNotFindMatchingSysCallException
 
-FS_OPEN_SYSTEM_CALLS_DEFINITIONS = [open_system_call_definition, openat_system_call_definition,
-                                    socket_system_call_definition]
-FS_OPEN_SYSTEM_CALL_NUMBERS = [open_system_call.system_call_number
-                               for open_system_call in FS_OPEN_SYSTEM_CALLS_DEFINITIONS]
+
+FS_OPEN_SYSTEM_CALL_NUMBERS = [system_consts.OPEN_SYS_CALL, system_consts.OPENAT_SYS_CALL,
+                               system_consts.SOCKET_SYS_CALL]
 
 
 SYS_CALLS_NOT_TO_SIMULATE = [system_consts.MMAP_SYS_CALL, system_consts.MPROTECT_SYS_CALL,
@@ -30,11 +24,11 @@ def _find_first_syscall_matching(system_calls, matcher_callback: Callable, raise
 
     :return: System Call or None
 
-    :raise CouldNotFindMatchingSyscallException if raise_if_not_found is True and no sys call was found
+    :raise CouldNotFindMatchingSysCallException if raise_if_not_found is True and no sys call was found
     """
     system_call = next((system_call for system_call in system_calls if matcher_callback(system_call)), None)
     if system_call is None and raise_if_not_found:
-        raise CouldNotFindMatchingSyscallException()
+        raise CouldNotFindMatchingSysCallException()
     return system_call
 
 
@@ -61,7 +55,7 @@ def _is_close_system_call_for_fd(system_call: SystemCall, fd: int):
     :param fd: fd to check if closing
     :return: whether or not it's a 'close' syscall on fd
     """
-    return system_call.num == close_system_call_definition.system_call_number and system_call.registers['rdi'] == fd
+    return system_call.num == system_consts.CLOSE_SYS_CALL and system_call.registers.rdi == fd
 
 
 def _is_mmap_system_call_for_fd(system_call: SystemCall, fd: int):
@@ -74,7 +68,7 @@ def _is_mmap_system_call_for_fd(system_call: SystemCall, fd: int):
     :param fd: fd to check if mmaping
     :return: whether or not it's a 'mmap' syscall on fd
     """
-    return system_call.num == system_consts.MMAP_SYS_CALL and system_call.registers['r8'] == fd
+    return system_call.num == system_consts.MMAP_SYS_CALL and system_call.registers.r8 == fd
 
 
 def _fd_appears_in_mmap_before_close(fd: int, system_calls: List[SystemCall], system_call_index: int):
@@ -98,14 +92,14 @@ def _should_simulate_open_system_call(system_calls, system_call, system_call_ind
 
 
 def _should_simulate_close_system_call(system_calls, system_call, system_call_index):
-    return not _mmap_appears_after_open_for_fd(system_call.registers['rdi'],  # rdi is register of the fd for close
+    return not _mmap_appears_after_open_for_fd(system_call.registers.rdi,  # rdi is register of the fd for close
                                                system_calls, system_call_index)
 
 
 HANDLERS = {
-    openat_system_call_definition.system_call_number: _should_simulate_open_system_call,
-    open_system_call_definition.system_call_number: _should_simulate_open_system_call,
-    close_system_call_definition.system_call_number: _should_simulate_close_system_call,
+    system_consts.OPENAT_SYS_CALL: _should_simulate_open_system_call,
+    system_consts.OPEN_SYS_CALL: _should_simulate_open_system_call,
+    system_consts.CLOSE_SYS_CALL: _should_simulate_close_system_call,
     **{
         sys_call: lambda *_: False
         for sys_call in SYS_CALLS_NOT_TO_SIMULATE

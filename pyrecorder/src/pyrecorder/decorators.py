@@ -15,7 +15,5 @@ def record(func):
     def _wrapper(*args, **kwargs):
         pager.send_request_to_take_snapshot()
         cpyrecorder.record_or_replay()
-        # if not consts.REPLAY_SERVER_PROC_PATH.exists():
-        #     start_recording()
         return func(*args, **kwargs)
     return _wrapper

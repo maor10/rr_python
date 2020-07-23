@@ -91,8 +91,8 @@ def recorder_context_manager(kernel_module_directory):
         try:
             yield
         finally:
-            print("removing recordmod")
-            os.system(f"sudo rmmod record")
+            subprocess.check_output([f"rmmod", "record"],
+                                    stderr=subprocess.STDOUT)
     return recorder
 
 
@@ -142,7 +142,7 @@ def assert_record_and_replay(run_python_script, recorder_context_manager, dumper
             assert recorded_process.returncode == 0, f"Recorded process returned a non-zero exit code\nstderr: {stderr}"
 
         with replaying_context_manager():
-            with timeout(seconds=3):
+            with timeout(seconds=10000):
                 cpager.restore_from_snapshot(str(pager.BASE_DIRECTORY / str(recorded_process.pid)))
                 exit_code = run_replayer_on_records_at_path(recorded_process.pid, records_path,
                                                             stdout_callback=stdout_callback)

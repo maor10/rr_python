@@ -1,7 +1,6 @@
 from typing import Dict, List
 
 from replayer.loader.system_call import SystemCall
-from .consts import REGISTER_NAMES_IN_PROTOCOL_ORDER
 from replayer.loader.memory_copy import MemoryCopy
 from .registers import Registers
 from .unpacker import BinaryUnpacker

@@ -1,7 +1,7 @@
 from typing import List, Callable, Dict
 import creplayer
 from replayer import syscall_handlers, system_consts
-from replayer.system_consts import REGISTER_NAMES, EXIT_GROUP_SYS_CALL
+from replayer.system_consts import EXIT_GROUP_SYS_CALL
 from .exceptions import UnexpectedSysCallException, UnexpectedRegistersException, \
     UnexpectedSystemCallReturnValueException
 from replayer.should_simulate import should_simulate_system_call

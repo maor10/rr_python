@@ -2,7 +2,6 @@ import os
 import signal
 from functools import wraps
 from pyrecorder import consts
-from pyrecorder.km_communicator import start_recording
 import cpyrecorder
 import pager
 

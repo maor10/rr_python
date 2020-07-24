@@ -30,15 +30,15 @@ PyObject *module = NULL;
 PyObject* attach_to_tracee_and_begin(pid_t pid) {
   LOG("Attaching...");
   
-  RAISE_EXCEPTION_WITH_ERRNO_ON_TRUE(ptrace(PTRACE_ATTACH, pid, 0, 0) == -1);
+  RAISE_EXCEPTION_WITH_ERRNO_ON_TRUE(-1 == ptrace(PTRACE_ATTACH, pid, 0, 0));
   waitpid(pid, 0, 0);
   
   LOG("Send PTRACE_CONT...");
 
-  RAISE_EXCEPTION_WITH_ERRNO_ON_TRUE(ptrace(PTRACE_CONT, pid, 0, 0) == -1);
+  RAISE_EXCEPTION_WITH_ERRNO_ON_TRUE(-1 == ptrace(PTRACE_CONT, pid, 0, 0));
   waitpid(pid, 0, 0);
   
-  Py_RETURN_NONE;
+  return Py_BuildValue("");
 }
 
 
@@ -57,7 +57,7 @@ PyObject* write_buffer_to_tracee(pid_t pid, long addr, char *buffer, int length)
 
   while (length >= word_size) {
     memcpy(data.chars, buffer, word_size);
-    RAISE_EXCEPTION_WITH_ERRNO_ON_TRUE(ptrace(PTRACE_POKEDATA, pid, addr, data.val) == -1);
+    RAISE_EXCEPTION_WITH_ERRNO_ON_TRUE(-1 == ptrace(PTRACE_POKEDATA, pid, addr, data.val));
     length -= word_size;
     buffer += word_size;
     addr += word_size;
@@ -65,12 +65,12 @@ PyObject* write_buffer_to_tracee(pid_t pid, long addr, char *buffer, int length)
 
   if (length > 0) {
     data.val = ptrace(PTRACE_PEEKTEXT, pid, addr, 0);
-    RAISE_EXCEPTION_WITH_ERRNO_ON_TRUE(data.val == -1);
+    RAISE_EXCEPTION_WITH_ERRNO_ON_TRUE(-1 == data.val);
     memcpy(data.chars, buffer, length);
     RAISE_EXCEPTION_WITH_ERRNO_ON_TRUE(ptrace(PTRACE_POKEDATA, pid, addr, data.val));
   }
 
-  Py_RETURN_NONE;
+  return Py_BuildValue("");
 }
 
 
@@ -88,7 +88,7 @@ PyObject* read_from_tracee(pid_t pid, long addr, char *buffer, int length) {
 
   while (length > 0) {
     data.val = ptrace(PTRACE_PEEKTEXT, pid, addr, 0);
-    RAISE_EXCEPTION_WITH_ERRNO_ON_TRUE(data.val == -1);
+    RAISE_EXCEPTION_WITH_ERRNO_ON_TRUE(-1 == data.val);
     if (length < word_size) {
       memcpy(buffer, data.chars, length);
     } else {
@@ -99,7 +99,7 @@ PyObject* read_from_tracee(pid_t pid, long addr, char *buffer, int length) {
     addr += word_size;
   }
 
-  Py_RETURN_NONE;
+  return Py_BuildValue("");
 }
 
 
@@ -107,7 +107,7 @@ static PyObject* py_attach_to_tracee_and_begin(PyObject *self, PyObject *args) {
   pid_t pid;
 
   RETURN_NULL_ON_TRUE(!PyArg_ParseTuple(args, "i", &pid));
-  RETURN_NULL_ON_TRUE(attach_to_tracee_and_begin(pid) == NULL);
+  RETURN_NULL_ON_TRUE(NULL == attach_to_tracee_and_begin(pid));
 
   return Py_BuildValue("");
 }
@@ -128,7 +128,7 @@ static PyObject* py_run_until_enter_or_exit_of_next_syscall(PyObject *self, PyOb
 
   RETURN_NULL_ON_TRUE(!PyArg_ParseTuple(args, "i", &pid));
 
-  RAISE_EXCEPTION_WITH_ERRNO_ON_TRUE(ptrace(PTRACE_SYSCALL, pid, 0, 0) == -1);
+  RAISE_EXCEPTION_WITH_ERRNO_ON_TRUE(-1 == ptrace(PTRACE_SYSCALL, pid, 0, 0));
   waitpid(pid, 0, 0);
 
   return Py_BuildValue("");
@@ -140,7 +140,7 @@ static PyObject* py_get_registers_from_tracee(PyObject *self, PyObject *args) {
   struct user_regs_struct regs;
 
   RETURN_NULL_ON_TRUE(!PyArg_ParseTuple(args, "i", &pid));
-  RAISE_EXCEPTION_WITH_ERRNO_ON_TRUE(ptrace(PTRACE_GETREGS, pid, 0, &regs) == -1);
+  RAISE_EXCEPTION_WITH_ERRNO_ON_TRUE(-1 == ptrace(PTRACE_GETREGS, pid, 0, &regs));
 
   return Py_BuildValue(
       "(KKKKKKKKKKKKKKKKKKKKK)", regs.r15, regs.r14, regs.r13, regs.r12, regs.rbp, 
@@ -159,10 +159,10 @@ static PyObject* py_set_registers_in_tracee(PyObject *self, PyObject *args) {
   RETURN_NULL_ON_TRUE(!PyArg_ParseTuple(args, "iKKKKKKKKKKKKKKKKKKKKK", &pid, &regs.r15, &regs.r14, &regs.r13, &regs.r12, &regs.rbp, &regs.rbx, &regs.r11, &regs.r10, &regs.r9, &regs.r8, 
   &regs.rax, &regs.rcx, &regs.rdx, 
   &regs.rsi, &regs.rdi, &regs.orig_rax, &regs.rip, &regs.cs, &regs.eflags, &regs.rsp, &regs.ss));
-  RAISE_EXCEPTION_WITH_ERRNO_ON_TRUE(ptrace(PTRACE_GETREGS, pid, 0, &regs) == -1);
+  RAISE_EXCEPTION_WITH_ERRNO_ON_TRUE(-1 == ptrace(PTRACE_GETREGS, pid, 0, &regs));
   RETURN_NULL_ON_TRUE(!PyArg_ParseTuple(args, "iKKKKKKKKKKKKKKKKKKKKK", &pid, &regs.r15, &regs.r14, &regs.r13, &regs.r12, &regs.rbp, &regs.rbx, &regs.r11, &regs.r10, 
   &regs.r9, &regs.r8, &regs.rax, &regs.rcx, &regs.rdx, &regs.rsi, &regs.rdi, &regs.orig_rax, &regs.rip, &regs.cs, &regs.eflags, &regs.rsp, &regs.ss));
-  RAISE_EXCEPTION_WITH_ERRNO_ON_TRUE(ptrace(PTRACE_SETREGS, pid, 0, &regs) == -1);
+  RAISE_EXCEPTION_WITH_ERRNO_ON_TRUE(-1 == trace(PTRACE_SETREGS, pid, 0, &regs));
 
   return Py_BuildValue("");
 }
@@ -175,7 +175,7 @@ static PyObject* py_write_to_tracee(PyObject *self, PyObject *args) {
   long length;
 
   RETURN_NULL_ON_TRUE(!PyArg_ParseTuple(args, "iKs#", &pid, &address, &buffer, &length));
-  RETURN_NULL_ON_TRUE(write_buffer_to_tracee(pid, address, buffer, length) == NULL);
+  RETURN_NULL_ON_TRUE(NULL == write_buffer_to_tracee(pid, address, buffer, length));
 
   return Py_BuildValue("");
 }
@@ -190,7 +190,7 @@ static PyObject* py_read_from_tracee(PyObject *self, PyObject *args) {
 
   RETURN_NULL_ON_TRUE(!PyArg_ParseTuple(args, "iKi", &pid, &address, &length));
   buffer = malloc(length);
-  RETURN_NULL_ON_TRUE(read_from_tracee(pid, address, buffer, length) == NULL);
+  RETURN_NULL_ON_TRUE(NULL == read_from_tracee(pid, address, buffer, length));
 
   res = Py_BuildValue("y#", buffer, length);
   free(buffer);

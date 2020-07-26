@@ -70,18 +70,3 @@ def whitelist_dmesg_context():
                                         f"Line '{line}' not in whitelist"
     
     return _whitelist_dmesg_context
-
-MAX_MEM_DIFF = 20000000
-
-# TODO: Maybe use kmemlean?
-@pytest.fixture
-def mem_leak_finder_context():
-    @contextlib.contextmanager
-    def _mem_leak_finder_context():
-        mem_before = psutil.virtual_memory().free
-        yield
-        diff = psutil.virtual_memory().free - mem_before
-
-        assert diff < MAX_MEM_DIFF
-    
-    return _mem_leak_finder_context

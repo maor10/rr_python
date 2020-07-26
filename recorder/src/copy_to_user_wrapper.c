@@ -1,5 +1,6 @@
 #include <linux/kprobes.h>
 #include <linux/list.h>
+#include <linux/slab.h>
 
 #include "utils.h"
 #include "copy_to_user_wrapper.h"

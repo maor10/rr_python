@@ -3,9 +3,41 @@ import os
 import contextlib
 import psutil
 from subprocess import check_output, check_call
+from replayer.system_calls.loader.system_call_loader import Loader
 
 KERNEL_MODULE = "record.ko"
 KERNEL_MODULE_PATH = f"../src/{KERNEL_MODULE}"
+READ_SIZE = 0xffff
+
+@pytest.fixture
+def get_recorded_syscalls():
+    def get():
+        fd = os.open("/proc/syscall_dumper", os.O_RDONLY | os.O_NONBLOCK)
+
+        content = b""
+        cur_read = os.read(fd, READ_SIZE)
+        while cur_read:
+            content += cur_read
+            cur_read = os.read(fd, READ_SIZE)
+        
+        return Loader.from_buffer(content).load_system_calls()[:-2] # Last 2 syscalls are lseek and close 
+
+    return get
+        
+@pytest.fixture
+def record_syscalls_context():
+    @contextlib.contextmanager
+    def _record_syscalls():
+        with open("/proc/recorded_process", "w") as f:
+            f.write(str(os.getpid()))
+            try:
+                f.flush()
+                yield
+            finally:
+                f.seek(0)
+                f.write("0")
+                f.flush()
+    return _record_syscalls
 
 @pytest.fixture
 def kernel_module_context():

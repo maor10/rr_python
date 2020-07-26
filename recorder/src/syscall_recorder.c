@@ -1,6 +1,7 @@
 #include <linux/kprobes.h>
 #include <asm/unistd.h>
 #include <linux/mutex.h>
+#include <linux/slab.h>
 
 #include "syscall_recorder.h"
 #include "copy_to_user_wrapper.h"

@@ -1,6 +1,7 @@
 #include <linux/kernel.h>
 #include <linux/kprobes.h>
 #include <linux/poll.h>
+#include <linux/slab.h>
 
 #include "utils.h"
 #include "copy_to_user_wrapper.h"

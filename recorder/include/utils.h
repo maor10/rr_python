@@ -19,6 +19,9 @@
 
 #define IF_TRUE_CLEANUP(...) _IF_TRUE_CLEANUP(__VA_ARGS__, 0)
 
+#define LOG(...) log_if_not_null(__VA_ARGS__);
+
+
 /*
  * @purpose: log received format if format is not NULL...
  * 

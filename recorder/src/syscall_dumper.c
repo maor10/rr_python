@@ -6,7 +6,7 @@
 #include <linux/slab.h>
 
 #include "utils.h"
-#include "syscall_wrapper.h"
+#include "syscall_recorder.h"
 #include "copy_to_user_wrapper.h"
 #include "syscall_dumper.h"
 
@@ -142,7 +142,6 @@ ssize_t dump_records(char __user *buf, size_t size) {
     ssize_t size_written = 0;
     ssize_t dump_ret;
     int did_do_first_write = 0;
-
     do {
         dump_ret = dump_single_record(buf, size);
         switch (dump_ret)
@@ -164,7 +163,6 @@ ssize_t dump_records(char __user *buf, size_t size) {
                 did_do_first_write = 1;
         }
     } while (!kfifo_is_empty(&recorded_syscalls));
-
     return size_written;
 }
 
@@ -197,6 +195,7 @@ ssize_t read_proc(struct file *file, char __user *buf, size_t size, loff_t *ppos
     return ret;
 
 cleanup_signal:
+    LOG("Cleanup signal");
     finish_wait(&recorded_syscalls_wait, &wait);
     return -ERESTARTSYS;
 }

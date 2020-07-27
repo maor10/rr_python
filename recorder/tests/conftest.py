@@ -3,7 +3,7 @@ import os
 import contextlib
 import psutil
 from subprocess import check_output, check_call
-from replayer.system_calls.loader.system_call_loader import Loader
+from replayer.loader.system_call_loader import Loader
 
 KERNEL_MODULE = "record.ko"
 KERNEL_MODULE_PATH = f"../src/{KERNEL_MODULE}"

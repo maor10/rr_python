@@ -15,8 +15,8 @@ PyObject *module = NULL;
 /**
  * Setup criu for both dumping and restoring
  **/
-PyObject* setup_criu(const char *file_path) {
-  int dir_fd = open(file_path, O_DIRECTORY);
+PyObject* setup_criu(const char *directory_path) {
+  int dir_fd = open(directory_path, O_DIRECTORY);
   RAISE_EXCEPTION_WITH_ERRNO_ON_TRUE(dir_fd == -1);
 
   // the following functions cannot fail (each returns void), they are merely setup
@@ -33,13 +33,13 @@ PyObject* setup_criu(const char *file_path) {
 
 static PyObject* take_snapshot(PyObject* self, PyObject *args) {
   pid_t pid = 0;
-  const char* file_path = NULL;
+  const char *directory_path = NULL;
 
-  if (!PyArg_ParseTuple(args, "is", &pid, &file_path))  {
+  if (!PyArg_ParseTuple(args, "is", &pid, &directory_path))  {
     return NULL;
   }
 
-  RETURN_NULL_ON_TRUE(setup_criu(file_path) == NULL);
+  RETURN_NULL_ON_TRUE(setup_criu(directory_path) == NULL);
   // following funcs cannot fail, merely setup
   criu_set_pid(pid);
   criu_set_leave_running(1);
@@ -52,12 +52,12 @@ static PyObject* take_snapshot(PyObject* self, PyObject *args) {
 
 static PyObject* restore_from_snapshot(PyObject* self, PyObject* args) {
   int res = 0;
-  char* file_path = NULL;
+  char *directory_path = NULL;
 
-  if (!PyArg_ParseTuple(args, "s", &file_path))  {
+  if (!PyArg_ParseTuple(args, "s", &directory_path))  {
       return NULL;
   }
-  RETURN_NULL_ON_TRUE(setup_criu(file_path) == NULL);
+  RETURN_NULL_ON_TRUE(setup_criu(directory_path) == NULL);
   
   res = criu_restore();
   // TODO: is errno not set? check if you can do this in a slightly more.. normal fashion 

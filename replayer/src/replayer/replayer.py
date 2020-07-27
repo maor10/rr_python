@@ -55,7 +55,7 @@ class Replayer:
             raise UnexpectedSystemCallReturnValueException(expected=recorded_system_call.return_value,
                                                            received=tracee_registers.rax)
 
-    def _get_registers_from_tracee(self):
+    def _get_registers_from_tracee(self) -> Registers:
         registers_list = creplayer.get_registers_from_tracee(self.pid)
         return Registers(*registers_list)
 
@@ -104,6 +104,7 @@ class Replayer:
         registers_for_invalid_sys_call.orig_rax = -5
         creplayer.set_registers_in_tracee(self.pid, *registers_for_invalid_sys_call.to_list())
         creplayer.run_until_enter_or_exit_of_next_syscall(self.pid)
+
         self.copy_memory_copies_to_tracee(recorded_system_call)
         new_registers = tracee_registers.copy()
         new_registers.rax = recorded_system_call.return_value
@@ -152,13 +153,12 @@ class Replayer:
         """
         creplayer.attach_to_tracee_and_begin(self.pid)
         for i, recorded_system_call in enumerate(self.system_calls):
-            self.raise_on_tracee_segfault()
             creplayer.run_until_enter_or_exit_of_next_syscall(self.pid)
             self.run_tracee_through_system_call(recorded_system_call, i)
         return self.get_exit_status()
 
 
-def run_replayer(pid: int, system_calls: List[SystemCall], stdout_callback: Callable):
+def run_replayer(pid: int, system_calls: List[SystemCall], stdout_callback: Callable) -> int:
     """
     Run the sys call interceptor on a given pid with given system calls responses
 
@@ -169,7 +169,7 @@ def run_replayer(pid: int, system_calls: List[SystemCall], stdout_callback: Call
     return Replayer(pid, system_calls, stdout_callback).start_replaying()
 
 
-def run_replayer_on_records_at_path(pid: int, path: str, stdout_callback=None):
+def run_replayer_on_records_at_path(pid: int, path: str, stdout_callback=None) -> int:
     """
     Run the sys call interceptor on a given pid with a path to a recording
 

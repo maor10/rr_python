@@ -16,10 +16,16 @@
 #include <poll.h>
 
 
+#define BREAKPOINT_SIGNAL_NUMBER 5 
+
+const int WORD_SIZE = sizeof(long);
+
+
 /**
  * Python module
  **/
 PyObject *module = NULL;
+
 
 
 
@@ -48,19 +54,17 @@ PyObject* attach_to_tracee_and_begin(pid_t pid) {
  * Converts buffer to words and copies them into tracee's memory at givven addr
  **/
 PyObject* write_buffer_to_tracee(pid_t pid, long addr, char *buffer, int length) {   
-  const int word_size = sizeof(long);
-
   union char_word_u {
-          long val;
-          char chars[word_size];
+    long val;
+    char chars[WORD_SIZE];
   } data;
 
-  while (length >= word_size) {
-    memcpy(data.chars, buffer, word_size);
+  while (length >= WORD_SIZE) {
+    memcpy(data.chars, buffer, WORD_SIZE);
     RAISE_EXCEPTION_WITH_ERRNO_ON_TRUE(-1 == ptrace(PTRACE_POKEDATA, pid, addr, data.val));
-    length -= word_size;
-    buffer += word_size;
-    addr += word_size;
+    length -= WORD_SIZE;
+    buffer += WORD_SIZE;
+    addr += WORD_SIZE;
   }
 
   if (length > 0) {
@@ -79,24 +83,18 @@ PyObject* write_buffer_to_tracee(pid_t pid, long addr, char *buffer, int length)
  * 
  **/
 PyObject* read_from_tracee(pid_t pid, long addr, char *buffer, int length) {
-  const int word_size = sizeof(long);
-
   union char_word_u {
-          long val;
-          char chars[word_size];
+    long val;
+    char chars[WORD_SIZE];
   } data;
 
   while (length > 0) {
     data.val = ptrace(PTRACE_PEEKTEXT, pid, addr, 0);
-    RAISE_EXCEPTION_WITH_ERRNO_ON_TRUE(-1 == data.val);
-    if (length < word_size) {
-      memcpy(buffer, data.chars, length);
-    } else {
-      memcpy(buffer, data.chars, word_size);
-    }
-    length -= word_size;
-    buffer += word_size;
-    addr += word_size;
+    RAISE_EXCEPTION_WITH_ERRNO_ON_TRUE(-1 == data.val && 0 != errno);
+    memcpy(buffer, data.chars, length < WORD_SIZE ? length : WORD_SIZE);
+    length -= WORD_SIZE;
+    buffer += WORD_SIZE;
+    addr += WORD_SIZE;
   }
 
   return Py_BuildValue("");
@@ -113,23 +111,16 @@ static PyObject* py_attach_to_tracee_and_begin(PyObject *self, PyObject *args) {
 }
 
 
-static PyObject* py_did_segault(PyObject *self, PyObject *args) {
-  pid_t pid;
-  siginfo_t siginfo;
-
-  RETURN_NULL_ON_TRUE(!PyArg_ParseTuple(args, "i", &pid));  
-  RAISE_EXCEPTION_WITH_ERRNO_ON_TRUE(ptrace(PTRACE_GETSIGINFO, pid, 0, &siginfo));
-
-  return PyBool_FromLong(siginfo.si_signo == SIGSEGV);
-}
-
 static PyObject* py_run_until_enter_or_exit_of_next_syscall(PyObject *self, PyObject *args) {
   pid_t pid;
+  int status;
 
   RETURN_NULL_ON_TRUE(!PyArg_ParseTuple(args, "i", &pid));
 
   RAISE_EXCEPTION_WITH_ERRNO_ON_TRUE(-1 == ptrace(PTRACE_SYSCALL, pid, 0, 0));
-  waitpid(pid, 0, 0);
+  waitpid(pid, &status, 0);
+
+  RAISE_EXCEPTION_ON_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) != BREAKPOINT_SIGNAL_NUMBER, "Pid stopped by signal");
 
   return Py_BuildValue("");
 }
@@ -162,7 +153,7 @@ static PyObject* py_set_registers_in_tracee(PyObject *self, PyObject *args) {
   RAISE_EXCEPTION_WITH_ERRNO_ON_TRUE(-1 == ptrace(PTRACE_GETREGS, pid, 0, &regs));
   RETURN_NULL_ON_TRUE(!PyArg_ParseTuple(args, "iKKKKKKKKKKKKKKKKKKKKK", &pid, &regs.r15, &regs.r14, &regs.r13, &regs.r12, &regs.rbp, &regs.rbx, &regs.r11, &regs.r10, 
   &regs.r9, &regs.r8, &regs.rax, &regs.rcx, &regs.rdx, &regs.rsi, &regs.rdi, &regs.orig_rax, &regs.rip, &regs.cs, &regs.eflags, &regs.rsp, &regs.ss));
-  RAISE_EXCEPTION_WITH_ERRNO_ON_TRUE(-1 == trace(PTRACE_SETREGS, pid, 0, &regs));
+  RAISE_EXCEPTION_WITH_ERRNO_ON_TRUE(-1 == ptrace(PTRACE_SETREGS, pid, 0, &regs));
 
   return Py_BuildValue("");
 }
@@ -199,7 +190,6 @@ static PyObject* py_read_from_tracee(PyObject *self, PyObject *args) {
 
 static PyMethodDef methods[]= {
   {"attach_to_tracee_and_begin", py_attach_to_tracee_and_begin, METH_VARARGS, "Attach to a process and begin execution"},
-  {"did_segfault", py_did_segault, METH_VARARGS, "Checks whether the process segfaultes"},
   {"run_until_enter_or_exit_of_next_syscall", py_run_until_enter_or_exit_of_next_syscall, METH_VARARGS, "Continue running tracee until an entering/exiting of syscall"},
   {"get_registers_from_tracee", py_get_registers_from_tracee, METH_VARARGS, "Get the current registers from the tracee"},
   {"set_registers_in_tracee", py_set_registers_in_tracee, METH_VARARGS, "Set the current registers in the tracee"},

@@ -1,6 +1,7 @@
 import contextlib
 import multiprocessing
 import os
+import shutil
 import subprocess
 import time
 from pathlib import Path
@@ -135,22 +136,27 @@ def assert_record_and_replay(run_python_script, recorder_context_manager, dumper
         replayed_stdout += text
 
     def _run(script_name, runtime_arguments=None, print_stdouts=False):
-        with recorder_context_manager(), dumper_context_manager(), pager_listener_context_manager():
-            recorded_process = run_python_script(script_name, runtime_arguments or [])
-            with timeout(seconds=3):
-                recorded_stdout, stderr = recorded_process.communicate()
-            assert recorded_process.returncode == 0, f"Recorded process returned a non-zero exit code\nstderr: {stderr}"
+        recorded_process = None
+        try:
+            with recorder_context_manager(), dumper_context_manager(), pager_listener_context_manager():
+                recorded_process = run_python_script(script_name, runtime_arguments or [])
+                with timeout(seconds=3):
+                    recorded_stdout, stderr = recorded_process.communicate()
+                assert recorded_process.returncode == 0, f"Recorded process returned a non-zero exit code\nstderr: {stderr}"
 
-        with replaying_context_manager():
-            with timeout(seconds=10000):
-                cpager.restore_from_snapshot(str(pager.BASE_DIRECTORY / str(recorded_process.pid)))
-                exit_code = run_replayer_on_records_at_path(recorded_process.pid, records_path,
-                                                            stdout_callback=stdout_callback)
+            with replaying_context_manager():
+                with timeout(seconds=10000):
+                    cpager.restore_from_snapshot(str(pager.BASE_DIRECTORY / str(recorded_process.pid)))
+                    exit_code = run_replayer_on_records_at_path(recorded_process.pid, records_path,
+                                                                stdout_callback=stdout_callback)
 
-        if print_stdouts:
-            print(f"Recorded STDOUT: {recorded_stdout}")
-            print(f"Replayed STDOUT: {replayed_stdout}")
-        assert exit_code == 0, stderr
-        assert recorded_stdout == replayed_stdout
-
+            if print_stdouts:
+                print(f"Recorded STDOUT: {recorded_stdout}")
+                print(f"Replayed STDOUT: {replayed_stdout}")
+            assert exit_code == 0, stderr
+            assert recorded_stdout == replayed_stdout
+        finally:
+            if recorded_process is not None:
+                directory = pager.BASE_DIRECTORY / str(recorded_process.pid)
+                shutil.rmtree(directory)
     return _run

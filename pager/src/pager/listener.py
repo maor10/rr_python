@@ -32,6 +32,7 @@ class Listener:
             pid = conn.recv()
 
             directory = self.base_directory / str(pid)
+            self.base_directory.mkdir(exist_ok=True)
             directory.mkdir(exist_ok=True)
             cpager.take_snapshot(pid, str(directory))
             start_recording(pid)

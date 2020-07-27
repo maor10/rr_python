@@ -12,7 +12,7 @@
 
 
 #define RAISE_EXCEPTION_ON_TRUE(arg, ...) if (arg) {   \
-  PyErr_Format(PyExc_ValueError, __VA_ARGS__); \
+  PyErr_Format(PyExc_SystemError, __VA_ARGS__); \
   LOG("Raising exception...");  \
   return NULL; \
 }

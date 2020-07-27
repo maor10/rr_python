@@ -51,5 +51,5 @@ def test_run_until_enter_or_exit_of_next_syscall_happy_flow(run_test_binary):
 def test_creplayer_did_tracee_segfault(run_test_binary):
     process = run_test_binary(str(Path(__file__).parent / 'binary_scripts'), 'should_segfault.c')
     creplayer.attach_to_tracee_and_begin(process.pid)
-    creplayer.run_until_enter_or_exit_of_next_syscall(process.pid)
-    assert creplayer.did_segfault(process.pid)
+    with pytest.raises(SystemError):
+        creplayer.run_until_enter_or_exit_of_next_syscall(process.pid)

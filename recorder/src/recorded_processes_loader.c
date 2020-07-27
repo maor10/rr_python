@@ -31,19 +31,14 @@ struct file_operations recorded_processes_proc_ops = {
 
 
 ssize_t write_proc(struct file *file, const char __user *ubuf, size_t count, loff_t *ppos) {
-    int size_written;
-	char buf[BUFFER_SIZE];
-	
     IF_TRUE_CLEANUP(*ppos > 0 || count > BUFFER_SIZE);
-	IF_TRUE_CLEANUP(copy_from_user(buf, ubuf, count));
-    IF_TRUE_CLEANUP(sscanf(buf, "%d", &recorded_process_pid) != 1);
+	IF_TRUE_CLEANUP(kstrtoint_from_user(ubuf, count, 10, &recorded_process_pid));
 
     LOG("Beginning to scan for pid %d", recorded_process_pid);
 
-	size_written = strlen(buf);
-	*ppos = size_written;
+	*ppos = count;
 
-	return size_written;
+	return count;
 cleanup:
     return -EFAULT;
 }

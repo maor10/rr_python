@@ -1,22 +1,22 @@
 import os
 import select
 
-def syscall_sum_copies(syscall):
+
+def get_sum_of_memory_copies_lengths(syscall):
     return sum(len(copy.buffer) for copy in syscall.memory_copies)
 
 def test_read(kernel_module, record_syscalls_context, get_recorded_syscalls):
-    with open("/dev/urandom") as f:
-        with record_syscalls_context():
-            ret = os.read(f.fileno(), 100)
+    with open("/dev/urandom") as f, record_syscalls_context():
+        read_size = os.read(f.fileno(), 100)
         
     syscalls = get_recorded_syscalls()
     
-    assert len(ret) == 100
+    assert len(read_size) == 100
 
     assert len(syscalls) == 1
     assert syscalls[0].name == "read"
     assert syscalls[0].return_value == 100
-    assert syscall_sum_copies(syscalls[0]) == 100
+    assert get_sum_of_memory_copies_lengths(syscalls[0]) == 100
     
 def test_write(kernel_module, record_syscalls_context, get_recorded_syscalls):
     
@@ -31,7 +31,7 @@ def test_write(kernel_module, record_syscalls_context, get_recorded_syscalls):
     assert len(syscalls) == 1
     assert syscalls[0].name == "write"
     assert syscalls[0].return_value == 100
-    assert syscall_sum_copies(syscalls[0]) == 0
+    assert get_sum_of_memory_copies_lengths(syscalls[0]) == 0
 
 def test_poll(kernel_module, record_syscalls_context, get_recorded_syscalls):
     with open("/dev/urandom", "rb") as f:
@@ -49,4 +49,4 @@ def test_poll(kernel_module, record_syscalls_context, get_recorded_syscalls):
     assert len(syscalls) == 1
     assert syscalls[0].name == "poll"
     assert syscalls[0].return_value > 0
-    assert syscall_sum_copies(syscalls[0]) == 1
+    assert get_sum_of_memory_copies_lengths(syscalls[0]) == 1

@@ -10,6 +10,9 @@ KERNEL_MODULE = "record.ko"
 KERNEL_MODULE_PATH = f"../src/{KERNEL_MODULE}"
 READ_SIZE = 0xffff
 
+START_RECORD_ME = b"1"
+STOP_RECORD_ME = b"0"
+
 
 @pytest.fixture
 def get_recorded_syscalls():
@@ -22,16 +25,16 @@ def get_recorded_syscalls():
             content += current_read
             current_read = os.read(fd, READ_SIZE)
         
-        # First syscall is close of /proc/recorded_process, 
+        # First syscall is close of /proc/record_command, 
         # And last 2 are open and write to that file. Don't return them!
         return Loader.from_buffer(content).load_system_calls()[1:-2]
 
     return get
         
-def start_record_pid(pid):
-    fd = os.open("/proc/recorded_process", os.O_WRONLY)
+def send_record_command(command):
+    fd = os.open("/proc/record_command", os.O_WRONLY)
     try:
-        os.write(fd, str(pid).encode())
+        os.write(fd, command)
     finally:
         os.close(fd)
 
@@ -39,11 +42,11 @@ def start_record_pid(pid):
 def record_syscalls_context():
     @contextlib.contextmanager
     def _record_syscalls():
-        start_record_pid(os.getpid())
+        send_record_command(START_RECORD_ME)
         try:
             yield
         finally:
-            start_record_pid(0) # Stop the recording
+            send_record_command(STOP_RECORD_ME)
     return _record_syscalls
 
 @pytest.fixture

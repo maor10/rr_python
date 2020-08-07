@@ -131,6 +131,7 @@ ssize_t dump_single_record(char __user *buf, size_t size) {
     IF_TRUE_CLEANUP(dump_copy_records(syscall_record, buf), "Failed to dump syscall copies!");
 
     free_syscall_record(syscall_record);
+    
     return len;
 cleanup_short_write:
     return -SHORT_WRITE_ERROR;

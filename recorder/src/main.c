@@ -8,6 +8,7 @@
 #include "syscall_dumper.h"
 #include "recorded_processes_loader.h"
 #include "syscall_wrapper.h"
+#include "rdtsc_recorder.h"
 
 MODULE_LICENSE("GPL");
 
@@ -18,13 +19,16 @@ static int __init recorder_init(void) {
 	IF_TRUE_CLEANUP(init_syscall_hook(), "Failed to init syscall hook");
 	IF_TRUE_GOTO(init_copy_hook(), cleanup_syscall_hook, "Failed to init syscall hook");
 	IF_TRUE_GOTO(init_syscall_wrappers(), cleanup_copy_hook, "Failed to init syscall wrapper!");
-	IF_TRUE_GOTO(init_syscall_dumper(), cleanup_syscall_wrapper, "Failed to init syscall dumper!");
+	IF_TRUE_GOTO(init_rdtsc_record(), cleanup_syscall_wrapper, "Failed to init rdtsc recorder!");
+	IF_TRUE_GOTO(init_syscall_dumper(), cleanup_rdtsc_record, "Failed to init syscall dumper!");
 	IF_TRUE_GOTO(init_recorded_processes_loader(), cleanup_syscall_dumper, "Failed to init syscall dumper!");
 
 	return 0;
 
 cleanup_syscall_dumper:
 	remove_syscall_dumper();
+cleanup_rdtsc_record:
+	remove_rdtsc_record();
 cleanup_syscall_wrapper:
 	remove_syscall_wrappers();
 cleanup_copy_hook:
@@ -40,6 +44,7 @@ static void __exit recorder_exit(void) {
 	remove_syscall_dumper();
 	remove_syscall_wrappers();
 	remove_recorded_processes_loader();
+	remove_rdtsc_record();
 	remove_copy_hook();
 	remove_syscall_hook();
 	return;

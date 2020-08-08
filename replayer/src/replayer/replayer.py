@@ -40,10 +40,10 @@ class Replayer:
 
     @staticmethod
     def raise_on_unexpected_state(recorded_system_call: SystemCall, tracee_registers: Registers):
-        if recorded_system_call.registers != tracee_registers \
-                and recorded_system_call.num not in SYS_CALLS_TO_IGNORE_IN_VALIDATION:
-            raise UnexpectedRegistersException(expected=recorded_system_call.registers,
-                                               received=tracee_registers)
+        # if recorded_system_call.registers != tracee_registers \
+        #         and recorded_system_call.num not in SYS_CALLS_TO_IGNORE_IN_VALIDATION:
+        #     raise UnexpectedRegistersException(expected=recorded_system_call.registers,
+        #                                        received=tracee_registers)
         if recorded_system_call.num != tracee_registers.sys_call:
             raise UnexpectedSysCallException(expected=recorded_system_call.num,
                                              received=tracee_registers.sys_call)

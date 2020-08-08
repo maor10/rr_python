@@ -13,6 +13,7 @@ except ImportError:
 
 PACKAGES = ['replayer', 'pyrecorder', 'pager']
 
+SYSTEM_PACKAGES = ['mysql-server', 'libmysqlclient-dev']
 
 @click.group()
 def cli():
@@ -25,6 +26,10 @@ def install():
     for package in PACKAGES:
         os.chdir(str((directory / package / 'src').absolute()))
         subprocess.check_call([sys.executable, '-m', 'pip', 'install', '-e', '.[tests]'])
+
+
+def install_apt_packages():
+    pass
 
 
 if __name__ == '__main__':

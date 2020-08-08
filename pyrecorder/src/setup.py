@@ -16,7 +16,7 @@ setup(name='pyrecorder',
       packages=find_packages(),
       install_requires=[],
       extras_require={
-          'tests': ['pytest', 'ipdb', 'psutil', 'interruptingcow'],
+          'tests': ['pytest', 'ipdb', 'psutil', 'interruptingcow', 'dataset', 'mysqlclient'],
       },
       ext_modules=[module],
       )

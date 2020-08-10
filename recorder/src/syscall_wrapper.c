@@ -7,7 +7,7 @@
 #include "copy_to_user_wrapper.h"
 #include "syscall_recorder.h"
 #include "recorded_processes_loader.h"
-
+#include "syscall_wrapper.h"
 
 // See docs for explenation
 struct syscall_wrapper {
@@ -27,6 +27,16 @@ struct syscall_recorded_mem {
 int get_poll_record_mem(struct pt_regs * regs, void * __user *addr, unsigned long *len);
 
 /*
+ * @purpose: get memory to record before getdents syscalls (it calls filldir)
+ */
+int get_getdents_record_mem(struct pt_regs * regs, void * __user *addr, unsigned long *len);
+
+/*
+ * @purpose: get memory to record before getdents64 syscalls
+ */
+int get_getdents64_record_mem(struct pt_regs * regs, void * __user *addr, unsigned long *len);
+
+/*
  * @purpose: Function to be called before wrapped syscall
  */
 int pre_wrap_syscall(struct kretprobe_instance * probe, struct pt_regs *regs);
@@ -36,22 +46,37 @@ int pre_wrap_syscall(struct kretprobe_instance * probe, struct pt_regs *regs);
  */
 int post_wrap_syscall(struct kretprobe_instance * probe, struct pt_regs *regs);
 
-struct syscall_wrapper poll_wrapper = {
-    .get_record_mem_callback    = get_poll_record_mem,
-    .retprobe.kp.symbol_name	= "do_sys_poll",
-    .retprobe.entry_handler 	= pre_wrap_syscall,
-    .retprobe.handler		    = post_wrap_syscall,
-    .retprobe.maxactive	    	= 1000,
-    .retprobe.data_size	    	= sizeof(struct poll_recorded_mem *),
-};
+DEFINE_WRAPPER(poll_wrapper, "do_sys_poll", get_poll_record_mem);
+DEFINE_WRAPPER(getdents_wrapper, "__x64_sys_getdents", get_getdents_record_mem);
+DEFINE_WRAPPER(getdents64_wrapper, "ksys_getdents64", get_getdents64_record_mem);
 
 struct kretprobe * syscall_wrappers[] = {
-    &(poll_wrapper.retprobe)
+    &(poll_wrapper.retprobe),
+    &(getdents_wrapper.retprobe),
+    &(getdents64_wrapper.retprobe)
 };
 
 int get_poll_record_mem(struct pt_regs * regs, void * __user *addr, unsigned long *len) {
     *addr = (void __user *) regs->di;
     *len = regs->si * sizeof(struct pollfd);
+
+    return 0;
+}
+
+int get_getdents_record_mem(struct pt_regs * regs, void * __user *addr, unsigned long *len) {
+    /* For some really fucking weird reason, the regs we get from param here are
+        bad, so we take the regsiters from userspace instead... */
+    struct pt_regs *userspace_regs = task_pt_regs(current);
+    
+    *addr = (void __user *) userspace_regs->si;
+    *len = userspace_regs->dx;
+    
+    return 0;
+}
+
+int get_getdents64_record_mem(struct pt_regs * regs, void * __user *addr, unsigned long *len) {
+    *addr = (void __user *) regs->si;
+    *len = regs->dx;
 
     return 0;
 }

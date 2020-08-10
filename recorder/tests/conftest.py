@@ -3,6 +3,7 @@ import os
 import contextlib
 import psutil
 import subprocess
+import ctypes
 from typing import List
 from replayer.loader.system_call_loader import Loader
 
@@ -77,3 +78,7 @@ def whitelist_dmesg_context():
                                         f"Line '{line}' not in whitelist"
     
     return _whitelist_dmesg_context
+
+@pytest.fixture
+def syscall_caller():
+    return ctypes.CDLL(None).syscall

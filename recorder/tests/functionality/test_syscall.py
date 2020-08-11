@@ -13,12 +13,7 @@ def get_sum_of_memory_copies_lengths(syscall):
     This function also check dups, meaning if 2 writes write
     to the same place, it will only count the first write
     """
-    written_bytes_offsets = set()
-    for copy in syscall.memory_copies:
-        for index in range(len(copy.buffer)):
-            written_bytes_offsets.add(copy.to_address + index)
-
-    return len(written_bytes_offsets)
+    return len({copy.to_address + i for copy in syscall.memory_copies for i in range(len(copy.buffer))})
 
 def test_read(kernel_module, record_syscalls_context, get_recorded_syscalls):
     with open("/dev/urandom") as f, record_syscalls_context():
@@ -92,7 +87,7 @@ def test_getdents(kernel_module, record_syscalls_context, get_recorded_syscalls,
 
 
     bytes_after = getdents_res.raw
-    bytes_changed_count = len([True for index, byte in enumerate(bytes_before) if byte != bytes_after[index]])
+    bytes_changed_count = len([1 for index, byte in enumerate(bytes_before) if byte != bytes_after[index]])
     assert bytes_changed_count == get_sum_of_memory_copies_lengths(syscalls[0])
 
 def test_getdents64(kernel_module, record_syscalls_context, get_recorded_syscalls, syscall_caller):
@@ -120,5 +115,5 @@ def test_getdents64(kernel_module, record_syscalls_context, get_recorded_syscall
 
 
     bytes_after = getdents_res.raw
-    bytes_changed_count = len([True for index, byte in enumerate(bytes_before) if byte != bytes_after[index]])
+    bytes_changed_count = len([1 for index, byte in enumerate(bytes_before) if byte != bytes_after[index]])
     assert bytes_changed_count == get_sum_of_memory_copies_lengths(syscalls[0])

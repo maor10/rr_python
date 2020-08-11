@@ -64,6 +64,7 @@ struct file_operations proc_ops = {
 	.read = read_proc,
 };
 
+
 unsigned long get_record_len(struct syscall_record *syscall_record) {
     
     unsigned long size = sizeof(struct syscall_dump);
@@ -176,6 +177,9 @@ ssize_t read_proc(struct file *file, char __user *buf, size_t size, loff_t *ppos
     while (kfifo_is_empty(&recorded_syscalls))
     {
         mutex_unlock(&recorded_syscalls_mutex);
+
+        IF_TRUE_GOTO(file->f_flags & O_NONBLOCK, cleanup_noblock);
+
         prepare_to_wait(&recorded_syscalls_wait, &wait, TASK_INTERRUPTIBLE);
 
         schedule();
@@ -195,9 +199,15 @@ ssize_t read_proc(struct file *file, char __user *buf, size_t size, loff_t *ppos
     return ret;
 
 cleanup_signal:
-    LOG("Cleanup signal");
+    ret = -ERESTARTSYS;
+    goto cleanup;
+
+cleanup_noblock:
+    ret = 0;
+
+cleanup:
     finish_wait(&recorded_syscalls_wait, &wait);
-    return -ERESTARTSYS;
+    return ret;
 }
 
 int init_syscall_dumper(void) {

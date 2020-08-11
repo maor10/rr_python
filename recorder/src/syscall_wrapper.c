@@ -67,11 +67,15 @@ int get_getdents_record_mem(struct pt_regs * regs, void * __user *addr, unsigned
     /* For some really fucking weird reason, the regs we get from param here are
         bad, so we take the regsiters from userspace instead... */
     struct pt_regs *userspace_regs = task_pt_regs(current);
-    
+    IF_TRUE_CLEANUP(NULL == userspace_regs, "Failed to received userspace regs!");
+
     *addr = (void __user *) userspace_regs->si;
     *len = userspace_regs->dx;
     
     return 0;
+    
+cleanup:
+    return -1;
 }
 
 int get_getdents64_record_mem(struct pt_regs * regs, void * __user *addr, unsigned long *len) {

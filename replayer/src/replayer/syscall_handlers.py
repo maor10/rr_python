@@ -1,6 +1,6 @@
 from typing import Dict
 
-from replayer.loader import Registers
+from replayer.loader.system_call import Registers
 from replayer.loader.system_call import SystemCall
 
 HANDLERS = {}

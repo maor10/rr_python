@@ -1,4 +1,2 @@
-from .system_call_loader import Loader
+from .events_loader import EventLoader
 from .system_call import SystemCall
-from .memory_copy import MemoryCopy
-from .registers import Registers

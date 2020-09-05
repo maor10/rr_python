@@ -1,13 +1,9 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
-#include <linux/kprobes.h>
 
 #include "utils.h"
-#include "syscall_recorder.h"
-#include "copy_to_user_wrapper.h"
-#include "syscall_dumper.h"
-#include "recorded_processes_loader.h"
-#include "syscall_wrapper.h"
+#include "record_manager.h"
+#include "events_manager.h"
 
 MODULE_LICENSE("GPL");
 
@@ -15,33 +11,23 @@ static int __init recorder_init(void) {
 
 	LOG("Initializing recorder...");
 
-	IF_TRUE_CLEANUP(init_syscall_hook(), "Failed to init syscall hook");
-	IF_TRUE_GOTO(init_copy_hook(), cleanup_syscall_hook, "Failed to init syscall hook");
-	IF_TRUE_GOTO(init_syscall_wrappers(), cleanup_copy_hook, "Failed to init syscall wrapper!");
-	IF_TRUE_GOTO(init_syscall_dumper(), cleanup_syscall_wrapper, "Failed to init syscall dumper!");
-	IF_TRUE_GOTO(init_recorded_processes_loader(), cleanup_syscall_dumper, "Failed to init syscall dumper!");
-
+	IF_TRUE_CLEANUP(init_events(), "Failed to init events manager!");
+	IF_TRUE_GOTO(init_recording(), cleanup_events, "Failed to init recording!");
+	
 	return 0;
 
-cleanup_syscall_dumper:
-	remove_syscall_dumper();
-cleanup_syscall_wrapper:
-	remove_syscall_wrappers();
-cleanup_copy_hook:
-	remove_copy_hook();
-cleanup_syscall_hook:
-	remove_syscall_hook();
+cleanup_events:
+	unload_events();
+
 cleanup:
 	return -1;
 }
 
 static void __exit recorder_exit(void) {
 	// TODO WHAT HAPPENS IF WE REMOVE WHILE IN HOOK?
-	remove_syscall_dumper();
-	remove_syscall_wrappers();
-	remove_recorded_processes_loader();
-	remove_copy_hook();
-	remove_syscall_hook();
+	unload_recording();
+	unload_events();
+	
 	return;
 }
 

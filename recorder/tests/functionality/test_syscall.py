@@ -15,16 +15,16 @@ def get_sum_of_memory_copies_lengths(syscall):
     """
     return len({copy.to_address + i for copy in syscall.memory_copies for i in range(len(copy.buffer))})
 
-def test_read(kernel_module, record_syscalls_context, get_recorded_syscalls):
-    with open("/dev/urandom") as f, record_syscalls_context():
+def test_read(kernel_module, record_events_context, get_recorded_events):
+    with open("/dev/urandom") as f, record_events_context():
         read_size = os.read(f.fileno(), 100)
         
-    syscalls = get_recorded_syscalls()
+    events = get_recorded_events()
     
     assert len(read_size) == 100
 
-    assert len(syscalls) == 1
-    assert syscalls[0].name == "read"
+    assert len(events) == 1
+    assert events[0].name == "read"
     assert syscalls[0].return_value == 100
     assert get_sum_of_memory_copies_lengths(syscalls[0]) == 100
     

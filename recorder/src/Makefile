@@ -1,5 +1,13 @@
 obj-m += record.o
-record-objs := main.o syscall_recorder.o syscall_wrapper.o copy_to_user_wrapper.o utils.o syscall_dumper.o recorded_processes_loader.o
+
+record-objs += main.o
+record-objs += utils.o
+record-objs += record_manager/record_manager.o
+record-objs += record_manager/recording_control_procfile.o
+record-objs += events_manager/events_manager.o
+record-objs += events_manager/events_dump_procfile.o
+record-objs += rdtsc_record/rdtsc_recorder.o
+record-objs += syscall_record/syscall_recorder.o
 
 ccflags-y += -I $(PWD)/include/
 

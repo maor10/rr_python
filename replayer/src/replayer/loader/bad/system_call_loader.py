@@ -6,7 +6,7 @@ from .registers import Registers
 from .unpacker import BinaryUnpacker
 
 
-class Loader:
+class SystemCallLoader:
 
     def __init__(self, binary_unpacker: BinaryUnpacker):
         self.binary_unpacker = binary_unpacker

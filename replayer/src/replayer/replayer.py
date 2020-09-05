@@ -5,10 +5,10 @@ from replayer.system_consts import EXIT_GROUP_SYS_CALL
 from .exceptions import UnexpectedSysCallException, UnexpectedRegistersException, \
     UnexpectedSystemCallReturnValueException
 from replayer.should_simulate import should_simulate_system_call
-from replayer.loader import SystemCall
-from replayer.loader.system_call_loader import Loader
+from replayer.loader.system_call import SystemCall
+from replayer.loader import EventLoader
 from replayer.tracing_exceptions import SegfaultException
-from .loader.registers import Registers
+from .loader.system_call import Registers
 
 
 # TODO: remove temporary hack which ignores validating certain sys calls because one of their registers is

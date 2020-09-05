@@ -1,4 +1,4 @@
-from .loader import Registers
+from .loader.system_call import Registers
 from .system_consts import SYS_CALL_NAMES
 
 

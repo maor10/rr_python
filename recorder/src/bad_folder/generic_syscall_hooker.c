@@ -8,12 +8,6 @@
 #include "recorded_processes_loader.h"
 #include "utils.h"
 
-
-// TODO -- is 1 << 15 Too big???
-// Maybe we should just save pointer to heap in kfifo?
-#define SYSCALL_FIFO_ORDER (15)
-#define SYSCALL_FIFO_SIZE (1 << SYSCALL_FIFO_ORDER)
-
 /*
  * @purpose:    Record all system calls recorded processes do.
  * 
@@ -38,10 +32,6 @@ int post_syscall(struct kretprobe_instance *probe, struct pt_regs *regs);
 
 // TODO -- what if multiple processes start syscall?
 struct syscall_record *current_syscall_record;
-
-DEFINE_MUTEX(recorded_syscalls_mutex);
-struct kfifo recorded_syscalls;
-DECLARE_WAIT_QUEUE_HEAD(recorded_syscalls_wait);
 
 struct kretprobe syscall_kretprobe = {
 	.kp.symbol_name	= "do_syscall_64",
@@ -118,15 +108,8 @@ cleanup:
 }
 
 int init_syscall_hook(void) {
-
-    IF_TRUE_GOTO(kfifo_alloc(&recorded_syscalls, SYSCALL_FIFO_SIZE, GFP_KERNEL),
-                    cleanup_unregister_kprobe, "Failed to alloc kfifo!");
-
 	IF_TRUE_CLEANUP(0 > register_kretprobe(&syscall_kretprobe), "Failed to init syscall kprobe!");
     return 0;
-
-cleanup_unregister_kprobe:
-    unregister_kretprobe(&syscall_kretprobe);
 
 cleanup:
     return -1;
@@ -134,5 +117,4 @@ cleanup:
 
 void remove_syscall_hook(void) {
     unregister_kretprobe(&syscall_kretprobe);
-    kfifo_free(&recorded_syscalls);
 }

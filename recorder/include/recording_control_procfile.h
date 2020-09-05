@@ -1,5 +1,5 @@
-#ifndef RECORDED_PROCESSES_LOADER_H
-#define RECORDED_PROCESSES_LOADER_H
+#ifndef RECORDING_CONTROL_PROCFILE
+#define RECORDING_CONTROL_PROCFILE
 
 
 extern int recorded_process_pid;
@@ -8,11 +8,11 @@ extern int recorded_process_pid;
 /*
  * @purpose: Create the proc file to load recorded processes
  */
-int init_recorded_processes_loader(void);
+int init_recording_control_procfile(void);
 
 /*
  * @purpose: Destroy the proc file to load recorded processes
  */
-void remove_recorded_processes_loader(void);
+void unload_recording_control_procfile(void);
 
 #endif

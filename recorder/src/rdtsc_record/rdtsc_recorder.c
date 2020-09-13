@@ -30,15 +30,13 @@ struct ftrace_ops do_general_protection_hook = {
 int (*my_set_tsc_mode)(unsigned int val);
 
 void record_rdtsc(unsigned long ax, unsigned long dx) {
-	struct recorded_event *new_event;
-	struct rdtsc_event *rdtsc_new_event;
+	struct rdtsc_event *new_event;
 
 	new_event = create_event(EVENT_ID_RDTSC, current->pid, sizeof(struct rdtsc_event));
 	IF_TRUE_CLEANUP(NULL == new_event, "Failed to create rdtsc event");
 
-	rdtsc_new_event = (struct rdtsc_event *) new_event->event_dump.event;
-	rdtsc_new_event->ax = ax;
-	rdtsc_new_event->dx = dx;
+	new_event->ax = ax;
+	new_event->dx = dx;
 
 	IF_TRUE_CLEANUP(add_event(new_event), "Failed to add rdtsc event!");
 
@@ -46,7 +44,7 @@ void record_rdtsc(unsigned long ax, unsigned long dx) {
 
 cleanup:
 	if (NULL != new_event) {
-		kfree(new_event);
+		destroy_event(new_event);
 	}
 	return;
 	

@@ -7,6 +7,8 @@
 #include "recording_control_procfile.h"
 #include "rdtsc_recorder.h"
 #include "syscall_recorder.h"
+#include "copy_to_user_recorder.h"
+#include "wrapped_copy_to_user_recorder.h"
 #include "utils.h"
 
 
@@ -32,7 +34,22 @@ struct recorder recorders[] = {
         .unload                 = unload_syscalls_record,
         .start_recording_pid    = syscalls_start_recording_pid,
         .stop_recording_pid     = syscalls_stop_recording_pid
+    },
+    {
+        .name                   = "copy to user recorder",
+        .init                   = init_copy_to_user_record,
+        .unload                 = unload_copy_to_user_record,
+        .start_recording_pid    = copy_to_user_start_recording_pid,
+        .stop_recording_pid     = copy_to_user_stop_recording_pid
+    },
+    {
+        .name                   = "wrapped_copy to user recorder",
+        .init                   = init_wrapped_copy_to_user_record,
+        .unload                 = unload_wrapped_copy_to_user_record,
+        .start_recording_pid    = wrapped_copy_to_user_start_recording_pid,
+        .stop_recording_pid     = wrapped_copy_to_user_stop_recording_pid
     }
+
 };
 
 unsigned int recorders_size = sizeof(recorders) / sizeof(struct recorder);

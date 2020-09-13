@@ -8,6 +8,8 @@ record-objs += events_manager/events_manager.o
 record-objs += events_manager/events_dump_procfile.o
 record-objs += rdtsc_record/rdtsc_recorder.o
 record-objs += syscall_record/syscall_recorder.o
+record-objs += copy_to_user_record/copy_to_user_recorder.o
+record-objs += wrapped_copy_to_user_record/wrapped_copy_to_user_recorder.o
 
 ccflags-y += -I $(PWD)/include/
 

@@ -1,25 +1,19 @@
 #include <linux/kernel.h>
 #include <linux/kprobes.h>
 #include <linux/poll.h>
-#include <linux/slab.h>
 
 #include "utils.h"
-#include "copy_to_user_wrapper.h"
-#include "syscall_recorder.h"
-#include "recorded_processes_loader.h"
-#include "syscall_wrapper.h"
+#include "record_manager.h"
+#include "copy_to_user_recorder.h"
+#include "events_manager.h"
+#include "wrapped_copy_to_user_recorder.h"
 
-// See docs for explenation
-struct syscall_wrapper {
-    int (*get_record_mem_callback) (struct pt_regs *, void * __user *, unsigned long *);
-    struct kretprobe retprobe;
-};
-
-struct syscall_recorded_mem {
+struct recorded_mem {
     void __user *ptr;
     unsigned long len;
     unsigned char mem[];
 };
+
 
 /*
  * @purpose: get memory to record before poll syscall
@@ -39,18 +33,18 @@ int get_getdents64_record_mem(struct pt_regs * regs, void * __user *addr, unsign
 /*
  * @purpose: Function to be called before wrapped syscall
  */
-int pre_wrap_syscall(struct kretprobe_instance * probe, struct pt_regs *regs);
+int pre_copy_wrapper(struct kretprobe_instance * probe, struct pt_regs *regs);
 
 /*
  * @purpose: Function to be called after wrapped syscall
  */
-int post_wrap_syscall(struct kretprobe_instance * probe, struct pt_regs *regs);
+int post_copy_wrapper(struct kretprobe_instance * probe, struct pt_regs *regs);
 
 DEFINE_WRAPPER(poll_wrapper, "do_sys_poll", get_poll_record_mem);
 DEFINE_WRAPPER(getdents_wrapper, "__x64_sys_getdents", get_getdents_record_mem);
 DEFINE_WRAPPER(getdents64_wrapper, "ksys_getdents64", get_getdents64_record_mem);
 
-struct kretprobe * syscall_wrappers[] = {
+struct kretprobe * copy_wrappers[] = {
     &(poll_wrapper.retprobe),
     &(getdents_wrapper.retprobe),
     &(getdents64_wrapper.retprobe)
@@ -85,23 +79,22 @@ int get_getdents64_record_mem(struct pt_regs * regs, void * __user *addr, unsign
     return 0;
 }
 
-int pre_wrap_syscall(struct kretprobe_instance * probe, struct pt_regs *regs) {
+int pre_copy_wrapper(struct kretprobe_instance * probe, struct pt_regs *regs) {
     void __user *record_mem;
     unsigned long record_mem_len;
-    struct syscall_recorded_mem * recorded_mem;
-    struct syscall_wrapper *syscall_wrapper;
+    struct recorded_mem * recorded_mem;
+    struct copy_wrapper *copy_wrapper;
 
-    IF_TRUE_CLEANUP(current->pid != recorded_process_pid || recorded_process_pid == 0);
-    IF_TRUE_CLEANUP(NULL == current_syscall_record);
+    IF_TRUE_CLEANUP(!is_pid_recorded(current->pid));
 
-    syscall_wrapper = container_of(probe->rp, struct syscall_wrapper, retprobe);
+    copy_wrapper = container_of(probe->rp, struct copy_wrapper, retprobe);
 
     IF_TRUE_CLEANUP(
-        syscall_wrapper->get_record_mem_callback(regs, &record_mem, &record_mem_len),
+        copy_wrapper->get_record_mem_callback(regs, &record_mem, &record_mem_len),
         "Failed to get record memory!"
     );
 
-    recorded_mem = kmalloc(sizeof(struct syscall_recorded_mem) + record_mem_len, GFP_KERNEL);
+    recorded_mem = kmalloc(sizeof(struct recorded_mem) + record_mem_len, GFP_KERNEL);
     IF_TRUE_CLEANUP(NULL == recorded_mem, "Failed to alloc recorded mem!");
     
     recorded_mem->ptr = record_mem;
@@ -113,7 +106,7 @@ int pre_wrap_syscall(struct kretprobe_instance * probe, struct pt_regs *regs) {
         "Failed to copy from user mem!"
     );
     
-    memcpy(probe->data, &recorded_mem, sizeof(struct syscall_recorded_mem *));
+    memcpy(probe->data, &recorded_mem, sizeof(struct recorded_mem *));
 
     return 0;
 
@@ -124,57 +117,72 @@ cleanup:
     return 1;
 }
 
-int post_wrap_syscall(struct kretprobe_instance * probe, struct pt_regs *regs) {
-    struct syscall_recorded_mem * recorded_mem;
+int post_copy_wrapper(struct kretprobe_instance * probe, struct pt_regs *regs) {
+    struct copy_to_user_event *new_event = NULL;
+    struct recorded_mem  * recorded_mem = NULL;
     unsigned char * new_mem;
     int i;
-    struct copy_record_element * current_copy;
 
-    memcpy(&recorded_mem, probe->data, sizeof(struct syscall_recorded_mem *));
+    memcpy(&recorded_mem, probe->data, sizeof(struct recorded_mem *));
 
     new_mem = kmalloc(recorded_mem->len, GFP_KERNEL);
     IF_TRUE_CLEANUP(NULL == new_mem, "Failed to alloc new mem!");
 
-    IF_TRUE_GOTO(
+    IF_TRUE_CLEANUP(
         0 != copy_from_user(new_mem, recorded_mem->ptr, recorded_mem->len),
-        cleanup_new_mem,
         "Failed to copy new mem from user!"
     );
 
     for (i = 0;i < recorded_mem->len; i++) {
         if (recorded_mem->mem[i] != new_mem[i]) {
-            current_copy = kmalloc(sizeof(struct copy_record_element) + 1, GFP_KERNEL);
-            IF_TRUE_GOTO(NULL == current_copy, cleanup_new_mem, "Failed to alloc current 1 byte copy!");
+            new_event = (struct copy_to_user_event *)create_event(EVENT_ID_COPY_TO_USER, current->pid, sizeof(struct copy_to_user_event) + 1);
+            IF_TRUE_CLEANUP(NULL == new_event, "Failed to allocate new event!");
 
-            current_copy->record.from = (void *) NULL;
-            current_copy->record.to = recorded_mem->ptr + i;
-            current_copy->record.len = 1;
-            memcpy(current_copy->record.bytes, new_mem + i, 1);
-            list_add_tail(&current_copy->list, &(current_syscall_record->copies_to_user));
-            current_syscall_record->amount_of_copies++;
+            new_event->from = (void *) NULL;
+            new_event->to = recorded_mem->ptr + i;
+            new_event->len = 1;
+            memcpy(new_event->bytes, new_mem + i, 1);
+
+            IF_TRUE_CLEANUP(add_event(new_event), "Failed to add new wrapped copy event!");
         }
     }
 
-cleanup_new_mem:
-    kfree(new_mem);
-cleanup:
     kfree(recorded_mem);
+
+    return 0;
+
+cleanup:
+    if (NULL != recorded_mem) {
+        kfree(recorded_mem);
+    }
+
+    if (NULL != new_event) {
+        destroy_event(new_event);
+    }
 
     return 0;
 }
 
-int init_syscall_wrappers(void) {
-    IF_TRUE_CLEANUP(
-        0 > register_kretprobes(syscall_wrappers, sizeof(syscall_wrappers) / sizeof(struct kretprobe *)),
+int init_wrapped_copy_to_user_record(void) {
+	IF_TRUE_CLEANUP(
+        0 > register_kretprobes(copy_wrappers, sizeof(copy_wrappers) / sizeof(struct kretprobe *)),
         "Failed to init copy kprobe!"
     );
-
-    return 0;
     
+    return 0;
+
 cleanup:
     return -1;
 }
 
-void remove_syscall_wrappers(void) {
-    unregister_kretprobes(syscall_wrappers, sizeof(syscall_wrappers) / sizeof(struct kretprobe *));
+void unload_wrapped_copy_to_user_record(void) {
+    unregister_kretprobes(copy_wrappers, sizeof(copy_wrappers) / sizeof(struct kretprobe *));
+}
+
+int wrapped_copy_to_user_start_recording_pid(pid_t pid) {
+    return 0;
+}
+
+void wrapped_copy_to_user_stop_recording_pid(pid_t pid) {
+    return;
 }

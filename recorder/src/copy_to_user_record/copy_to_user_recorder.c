@@ -1,11 +1,10 @@
 #include <linux/kprobes.h>
-#include <linux/list.h>
-#include <linux/slab.h>
 
+#include "copy_to_user_recorder.h"
+#include "record_manager.h"
+#include "events_manager.h"
 #include "utils.h"
-#include "copy_to_user_wrapper.h"
-#include "syscall_recorder.h"
-#include "recorded_processes_loader.h"
+
 
 /*
  * @purpose: Record all data kernel puts to userspace in processes we record
@@ -55,6 +54,8 @@ struct kretprobe copy_kretprobe = {
         .kp.symbol_name	= "_copy_to_user",
         .entry_handler 	= pre_copy,
         .handler		= post_copy,
+        // We need to save event to only add it if copy was success
+        .data_size      = sizeof(struct recorded_event *),
         .maxactive		= 1000
 };
 
@@ -62,53 +63,50 @@ struct kretprobe copyout_kretprobe = {
         .kp.symbol_name	= "copyout",
         .entry_handler 	= pre_copy,
         .handler		= post_copy,
+        // We need to save event to only add it if copy was success
+        .data_size      = sizeof(struct recorded_event *),
         .maxactive		= 1000
 };
-
-struct kretprobe * copy_kretprobes[] = {&copy_kretprobe, &copyout_kretprobe};
 
 struct kretprobe put_user_1_kretprobes = {
         .kp.symbol_name	= "__put_user_1",
         .entry_handler 	= pre_put,
-        .handler		= post_put,
+        .handler		= post_copy,
         .maxactive		= 1000,
-        .data_size		= 1
+        // Document the fuck why we use + 1
+        .data_size      = sizeof(struct recorded_event *) + 1,
 };
 
 struct kretprobe put_user_2_kretprobes = {
         .kp.symbol_name	= "__put_user_2",
         .entry_handler 	= pre_put,
-        .handler		= post_put,
+        .handler		= post_copy,
         .maxactive		= 1000,
-        .data_size		= 2
+        .data_size      = sizeof(struct recorded_event *) + 2,
 };
 
 struct kretprobe put_user_4_kretprobes = {
         .kp.symbol_name	= "__put_user_4",
         .entry_handler 	= pre_put,
-        .handler		= post_put,
+        .handler		= post_copy,
         .maxactive		= 1000,
-        .data_size		= 4
+        .data_size      = sizeof(struct recorded_event *) + 4,
 };
 
 struct kretprobe put_user_8_kretprobes = {
         .kp.symbol_name	= "__put_user_8",
         .entry_handler 	= pre_put,
-        .handler		= post_put,
+        .handler		= post_copy,
         .maxactive		= 1000,
-        .data_size		= 8
+        .data_size      = sizeof(struct recorded_event *) + 8,
 };
 
-struct kretprobe * put_user_kretprobes[] = {
+struct kretprobe * copy_kretprobes[] = {
+    &copy_kretprobe, &copyout_kretprobe,
     &put_user_1_kretprobes, &put_user_2_kretprobes,
     &put_user_4_kretprobes, &put_user_8_kretprobes
 };
 
-struct copy_record_element * current_copy = NULL;
-
-void free_copy_record(struct copy_record_element * copy_record) {
-    kfree(copy_record);
-}
 
 union put_data {
     uint8_t byte;
@@ -118,78 +116,67 @@ union put_data {
 };
 
 int pre_put(struct kretprobe_instance * probe, struct pt_regs *regs) {
-    union put_data * new_data;
+    struct copy_to_user_event *new_event = NULL;
+    union put_data * put_data;
     unsigned long copy_len;
 
-    IF_TRUE_CLEANUP(current->pid != recorded_process_pid || recorded_process_pid == 0);
-    IF_TRUE_CLEANUP(NULL == current_syscall_record);
-    IF_TRUE_CLEANUP(NULL != current_copy, "ERROR! Can only record one copy at the same time!");
-
-    copy_len = probe->rp->data_size;
+    IF_TRUE_CLEANUP(!is_pid_recorded(current->pid));
     
-    current_copy = kmalloc(sizeof(struct copy_record_element) + copy_len, GFP_KERNEL);
-    IF_TRUE_CLEANUP(NULL == current_copy, "Failed to alloc current put!");
+    copy_len = probe->rp->data_size - sizeof(struct recorded_event *);
 
-    current_copy->record.from = (void *) NULL;
-    current_copy->record.to = (void *) regs->cx;
-    current_copy->record.len = copy_len;
-    new_data = (union put_data *) current_copy->record.bytes;
-    
+    new_event = (struct copy_to_user_event *)create_event(EVENT_ID_COPY_TO_USER, current->pid, sizeof(struct copy_to_user_event) + copy_len);
+    IF_TRUE_CLEANUP(NULL == new_event, "Failed to allocate new event!");
+
+    new_event->from = (void *) NULL;
+    new_event->to = (void *) regs->cx;
+    new_event->len = copy_len;
+
+    put_data = (union put_data *) new_event->bytes;
     switch (copy_len) {
         case 1:
-            new_data->byte = regs->ax;
+            put_data->byte = regs->ax;
             break;
         case 2:
-            new_data->word = regs->ax;
+            put_data->word = regs->ax;
             break;
         case 4:
-            new_data->dword = regs->ax;
+            put_data->dword = regs->ax;
             break;
         case 8:
-            new_data->qword = regs->ax;
+            put_data->qword = regs->ax;
             break;
     }
 
+    memcpy(probe->data, &new_event, sizeof(new_event));
+
     return 0;
+
 cleanup:
+    if (NULL != new_event) {
+        destroy_event(new_event);
+    }
+
     return 1;
 }
 
-int post_put(struct kretprobe_instance *probe, struct pt_regs *regs) {
-    IF_TRUE_CLEANUP(regs_return_value(regs), "copy_to_user failed! not saving.");
-
-    list_add_tail(&current_copy->list, &(current_syscall_record->copies_to_user));
-    current_syscall_record->amount_of_copies++;
-    
-    // If we put every thing in list like we want we don't want to free element
-    goto cleanup_without_free;
-
-cleanup:
-    kfree(current_copy);
-
-cleanup_without_free:
-    current_copy = NULL;
-
-	return 0;
-}
-
 int pre_copy(struct kretprobe_instance * probe, struct pt_regs *regs) {
+    struct copy_to_user_event *new_event;
     
     unsigned long copy_len = (unsigned long) regs->dx;
 
-    IF_TRUE_CLEANUP(current->pid != recorded_process_pid || recorded_process_pid == 0);
-    IF_TRUE_CLEANUP(NULL == current_syscall_record);
-    IF_TRUE_CLEANUP(NULL != current_copy, "ERROR! Can only record one copy at the same time!");
-    // IF_TRUE_CLEANUP(0 == copy_len, "ERROR! Trying to copy something with 0 len!");
+    IF_TRUE_CLEANUP(!is_pid_recorded(current->pid));
 
-    current_copy = kmalloc(sizeof(struct copy_record_element) + copy_len, GFP_KERNEL);
-    IF_TRUE_CLEANUP(NULL == current_copy, "Failed to alloc current copy!");
+    new_event = (struct copy_to_user_event *)create_event(EVENT_ID_COPY_TO_USER, current->pid, sizeof(struct copy_to_user_event) + copy_len);
+    IF_TRUE_CLEANUP(NULL == new_event, "Failed to allocate new event!");
+    
+    new_event->from = (void *) regs->si;
+    new_event->to = (void *) regs->di;
+    new_event->len = copy_len;
 
-    current_copy->record.from = (void *) regs->si;
-    current_copy->record.to = (void *) regs->di;
-    current_copy->record.len = copy_len;
+    memcpy(new_event->bytes, new_event->from, new_event->len);
 
-	return 0;
+    memcpy(probe->data, &new_event, sizeof(new_event));
+    return 0;
 
 cleanup:
     return 1;
@@ -197,47 +184,43 @@ cleanup:
 
 
 int post_copy(struct kretprobe_instance *probe, struct pt_regs *regs) {
+    struct copy_to_user_event *new_event;
 
-    IF_TRUE_CLEANUP(regs_return_value(regs), "copy_to_user failed! not saving.");
+    memcpy(&new_event, probe->data, sizeof(new_event));
 
-    if (current_copy->record.len > 0) {
-        memcpy(current_copy->record.bytes, current_copy->record.from, current_copy->record.len);
-    }
+    IF_TRUE_CLEANUP(regs_return_value(regs), "copy failed! not saving.");
+    IF_TRUE_CLEANUP(add_event(new_event), "Failed to add new copy event!");
 
-    list_add_tail(&current_copy->list, &(current_syscall_record->copies_to_user));
-    current_syscall_record->amount_of_copies++;
-    
-    // If we put every thing in list like we want we don't want to free element
-    goto cleanup_without_free;
+    return 0;
 
 cleanup:
-    kfree(current_copy);
-
-cleanup_without_free:
-    current_copy = NULL;
+    if (NULL != new_event) {
+        destroy_event(new_event);
+    }
 
 	return 0;
 }
 
-int init_copy_hook(void) {
+int init_copy_to_user_record(void) {
 	IF_TRUE_CLEANUP(
         0 > register_kretprobes(copy_kretprobes, sizeof(copy_kretprobes) / sizeof(struct kretprobe *)),
         "Failed to init copy kprobe!"
     );
-
-    IF_TRUE_CLEANUP(
-        0 > register_kretprobes(put_user_kretprobes, sizeof(put_user_kretprobes) / sizeof(struct kretprobe *)),
-        "Failed to init put kprobe!"
-    );
-
+    
     return 0;
 
 cleanup:
     return -1;
 }
 
-void remove_copy_hook(void)
-{
+void unload_copy_to_user_record(void) {
     unregister_kretprobes(copy_kretprobes, sizeof(copy_kretprobes) / sizeof(struct kretprobe *));
-    unregister_kretprobes(put_user_kretprobes, sizeof(put_user_kretprobes) / sizeof(struct kretprobe *));
+}
+
+int copy_to_user_start_recording_pid(pid_t pid) {
+    return 0;
+}
+
+void copy_to_user_stop_recording_pid(pid_t pid) {
+    return;
 }

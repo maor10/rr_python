@@ -9,6 +9,10 @@ struct syscall_start_event {
     struct pt_regs userspace_regs;
 };
 
+struct syscall_done_event {
+    unsigned long ret;
+};
+
 int init_syscalls_record(void);
 void unload_syscalls_record(void);
 

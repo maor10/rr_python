@@ -14,7 +14,6 @@ def test_rdtsc_recorded(kernel_module, record_events_context, get_recorded_event
     
     events = get_recorded_events()
     
-    assert len(events) == 1
     assert events[0].event_type == 0 # TODO NO USE MAGIC FUCKING NUMS
 
     assert events[0].event_data.ax == counter & 0xFFFFFFFF

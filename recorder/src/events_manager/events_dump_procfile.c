@@ -32,6 +32,7 @@ error:
     ret = -EFAULT;
 cleanup:
     if (NULL != recorded_event) {
+        // TODO: Document why here you kfree and otherplaces destroy_event
         kfree(recorded_event);
     }
 

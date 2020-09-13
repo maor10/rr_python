@@ -13,7 +13,7 @@ DEFINE_MUTEX(recorded_events_mutex);
 struct kfifo recorded_events;
 
 
-struct recorded_event * create_event(unsigned char event_id, pid_t pid, unsigned int event_len) {
+void * create_event(unsigned char event_id, pid_t pid, unsigned int event_len) {
     struct recorded_event *new_event;
     
     new_event = kmalloc(sizeof(struct recorded_event) + event_len, GFP_ATOMIC);
@@ -22,14 +22,32 @@ struct recorded_event * create_event(unsigned char event_id, pid_t pid, unsigned
     new_event->event_dump.pid = pid;
 	new_event->event_dump.event_id = event_id;
 
-    return new_event;
+    return new_event->event_dump.event;
 
 cleanup:
     return NULL;
 
 }
 
-int add_event(struct recorded_event *event) {
+void destroy_event(void *event_data) {
+    struct recorded_event_dump * recorded_event_dump =
+            container_of(event_data, struct recorded_event_dump, event);
+
+    
+    struct recorded_event *event =
+            container_of(recorded_event_dump, struct recorded_event, event_dump);
+
+    kfree(event);
+}
+
+int add_event(void *event_data) {
+    struct recorded_event_dump * recorded_event_dump =
+            container_of(event_data, struct recorded_event_dump, event);
+
+    
+    struct recorded_event *event =
+            container_of(recorded_event_dump, struct recorded_event, event_dump);
+
     int ret = -1;
 
     mutex_lock(&recorded_events_mutex);
@@ -52,6 +70,7 @@ struct recorded_event * read_event(int blocking) {
                             "Failed to read from kfifo");
 
     return ret;
+
 cleanup:
     return NULL;
 }

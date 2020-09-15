@@ -16,7 +16,17 @@
 void do_general_protection_switch(unsigned long ip, unsigned long parent_ip,
                    struct ftrace_ops *op, struct pt_regs *regs);
 
+/* 
+ * @purpose: Hook of do_general_protection when RDTSC is called
+ * 				This function will emulate userpace RDTSC and record it
+ * 
+ */
 void my_do_general_protection(struct pt_regs *regs, long error_code);
+
+/*
+ * @purpose: Record a rdtsc event.
+ */
+void record_rdtsc(unsigned long ax, unsigned long dx);
 
 #define FUNC_TO_HOOK "do_general_protection"
 struct ftrace_ops do_general_protection_hook = {

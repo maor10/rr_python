@@ -3,7 +3,6 @@
 
 #include <linux/kernel.h>
 
-
 struct copy_to_user_event {
     void * from;
     void * to;

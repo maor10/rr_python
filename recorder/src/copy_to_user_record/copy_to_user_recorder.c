@@ -73,7 +73,10 @@ struct kretprobe put_user_1_kretprobes = {
         .entry_handler 	= pre_put,
         .handler		= post_copy,
         .maxactive		= 1000,
-        // Document the fuck why we use + 1
+        /* The data size of data we need to save +
+         * Data size of put. This isn't used memory, but we use
+         * this size in code to know which __put_user_* was called
+         */
         .data_size      = sizeof(struct recorded_event *) + 1,
 };
 
@@ -82,6 +85,10 @@ struct kretprobe put_user_2_kretprobes = {
         .entry_handler 	= pre_put,
         .handler		= post_copy,
         .maxactive		= 1000,
+        /* The data size of data we need to save +
+         * Data size of put. This isn't used memory, but we use
+         * this size in code to know which __put_user_* was called
+         */
         .data_size      = sizeof(struct recorded_event *) + 2,
 };
 
@@ -90,6 +97,10 @@ struct kretprobe put_user_4_kretprobes = {
         .entry_handler 	= pre_put,
         .handler		= post_copy,
         .maxactive		= 1000,
+        /* The data size of data we need to save +
+         * Data size of put. This isn't used memory, but we use
+         * this size in code to know which __put_user_* was called
+         */
         .data_size      = sizeof(struct recorded_event *) + 4,
 };
 
@@ -98,6 +109,10 @@ struct kretprobe put_user_8_kretprobes = {
         .entry_handler 	= pre_put,
         .handler		= post_copy,
         .maxactive		= 1000,
+        /* The data size of data we need to save +
+         * Data size of put. This isn't used memory, but we use
+         * this size in code to know which __put_user_* was called
+         */
         .data_size      = sizeof(struct recorded_event *) + 8,
 };
 

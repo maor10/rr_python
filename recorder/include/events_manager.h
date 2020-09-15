@@ -26,13 +26,34 @@ struct recorded_event {
     struct recorded_event_dump event_dump;
 };
 
+extern struct wait_queue_head recorded_events_wait;
+
 void * create_event(uint8_t event_id, pid_t pid, unsigned int event_len);
 void destroy_event(void *event);
 
-struct recorded_event * read_event(int blocking);
+/*
+ * @purpose: Add an event to recorded events fifo.
+ */
 int add_event(void *event);
 
+/*
+ * @purpose: Is events fifo empty.
+ */
+int is_events_empty(void);
+
+/*
+ * @purpose: Dump as many events to userspace
+ */
+ssize_t dump_events(char * __user addr, int max_size);
+
+/*
+ * @purpose: Initialize the events engine
+ */
 int init_events(void);
+
+/*
+ * @purpose: Unload the events engine
+ */
 void unload_events(void);
 
 #endif

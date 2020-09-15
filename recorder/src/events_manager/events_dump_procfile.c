@@ -1,6 +1,8 @@
 #include <linux/proc_fs.h>
 #include <linux/uaccess.h>
 #include <linux/slab.h>
+#include <linux/sched/signal.h>
+
 
 
 #include "utils.h"
@@ -8,6 +10,9 @@
 
 #define PROC_NAME "events_dump"
 
+/*
+ * @purpose: func called when read from the events proc file /proc/<PROC_NAME> 
+ */
 ssize_t read_proc(struct file *file, char __user *buf, size_t size, loff_t *ppos);
 
 struct file_operations proc_ops = {
@@ -15,28 +20,38 @@ struct file_operations proc_ops = {
 };
 
 ssize_t read_proc(struct file *file, char __user *buf, size_t size, loff_t *ppos) {
-    struct recorded_event *recorded_event = NULL;
-    ssize_t ret = 0;
+    ssize_t ret;
 
-    recorded_event = read_event(0);
-    IF_TRUE_CLEANUP(NULL == recorded_event);
+    DEFINE_WAIT(wait);
 
-    IF_TRUE_GOTO(size < recorded_event->len, error, "Requested read %d too small!", size);
-    IF_TRUE_GOTO(0 != copy_to_user(buf, &(recorded_event->event_dump), recorded_event->len), 
-                        error,
-                        "Failed to copy to user!");
+    add_wait_queue(&recorded_events_wait, &wait);
 
-    ret = recorded_event->len;
-    goto cleanup;
-error:
-    ret = -EFAULT;
-cleanup:
-    if (NULL != recorded_event) {
-        // TODO: Document why here you kfree and otherplaces destroy_event
-        kfree(recorded_event);
+    while (is_events_empty()) {
+        IF_TRUE_GOTO(file->f_flags & O_NONBLOCK, cleanup_noblock);
+
+        prepare_to_wait(&recorded_events_wait, &wait, TASK_INTERRUPTIBLE);
+        schedule();
+
+        // TODO Make sure we did dis good
+        // If woken up from signal
+        IF_TRUE_GOTO(signal_pending(current), cleanup_signal);
+
     }
+    
+    ret = dump_events(buf, size);
+    goto cleanup;
 
+cleanup_signal:
+    ret = -ERESTARTSYS;
+    goto cleanup;
+
+cleanup_noblock:
+    ret = 0;
+
+cleanup:
+    finish_wait(&recorded_events_wait, &wait);
     return ret;
+//    return dump_events(buf, size);
 }
 
 int init_events_dump_procfile(void) {

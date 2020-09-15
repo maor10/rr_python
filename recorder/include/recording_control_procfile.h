@@ -1,10 +1,6 @@
 #ifndef RECORDING_CONTROL_PROCFILE
 #define RECORDING_CONTROL_PROCFILE
 
-
-extern int recorded_process_pid;
-
-
 /*
  * @purpose: Create the proc file to load recorded processes
  */

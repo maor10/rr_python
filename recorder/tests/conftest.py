@@ -25,6 +25,8 @@ def get_recorded_events():
         while current_read:
             content += current_read
             current_read = os.read(fd, READ_SIZE)
+            if current_read:
+                print("reading again")
         
         # First syscall is close of /proc/record_command, 
         # And last 2 are open and write to that file. Don't return them!

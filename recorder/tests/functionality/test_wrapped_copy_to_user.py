@@ -29,7 +29,7 @@ def test_poll(kernel_module, record_events_context, get_recorded_events, get_cop
     assert len(ret) == 1
     assert ret[0][1] == select.POLLIN
 
-    copies = get_copies_from_events(events) 
+    copies = get_copies_from_events(events)
     assert len(copies) == 1
     assert int.from_bytes(copies[0].data, "little") == select.POLLIN
 

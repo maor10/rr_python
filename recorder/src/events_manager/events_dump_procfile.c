@@ -21,11 +21,9 @@ struct file_operations proc_ops = {
 
 ssize_t read_proc(struct file *file, char __user *buf, size_t size, loff_t *ppos) {
     ssize_t ret;
-
     DEFINE_WAIT(wait);
 
     add_wait_queue(&recorded_events_wait, &wait);
-
     while (is_events_empty()) {
         IF_TRUE_GOTO(file->f_flags & O_NONBLOCK, cleanup_noblock);
 
@@ -51,7 +49,6 @@ cleanup_noblock:
 cleanup:
     finish_wait(&recorded_events_wait, &wait);
     return ret;
-//    return dump_events(buf, size);
 }
 
 int init_events_dump_procfile(void) {

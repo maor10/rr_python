@@ -34,7 +34,7 @@ struct kretprobe syscall_kretprobe = {
     // Backup pointer to userspace regs to get ret of syscall
     .data_size      = sizeof(struct pt_regs *),
 	// TODO: Understand why after execve check still need maxactive...
-	.maxactive		= 1000
+	.maxactive		= 1
 };
 
 int pre_syscall(struct kretprobe_instance * probe, struct pt_regs *regs) {

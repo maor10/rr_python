@@ -26,15 +26,41 @@ struct recorded_event {
     struct recorded_event_dump event_dump;
 };
 
+/*
+ * This data type points to the place in struct recorded_event where
+ *      specific event data should be written to.
+ */
+typedef void event_data;
+
 extern struct wait_queue_head recorded_events_wait;
 
-void * create_event(uint8_t event_id, pid_t pid, unsigned int event_len);
-void destroy_event(void *event);
+/*
+ * @purpose: The following function creates an event object.
+ * 
+ * @params:
+ *      event_id:   One of the defined event ids.
+ *      pid:        The pid of the process where event happened in.
+ *      event_len:  The length of the event data (specific to every event_id).
+ * 
+ * @return: This function returns a pointer to where event data should be written to.
+ */
+event_data * create_event(uint8_t event_id, pid_t pid, unsigned int event_len);
+
+/*
+ * @purpose: Destroy an event.
+ * 
+ * @params:
+ *      event:      Pointer to event_data (!!!!!) -- not struct recorded_event.
+ */
+void destroy_event(event_data *event);
 
 /*
  * @purpose: Add an event to recorded events fifo.
+ * 
+ * @params:
+ *      event:      Pointer to event data of event that should be added
  */
-int add_event(void *event);
+int add_event(event_data *event);
 
 /*
  * @purpose: Is events fifo empty.

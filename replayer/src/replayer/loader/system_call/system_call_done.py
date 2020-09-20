@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-
+SYSTEM_CALL_DONE_EVENT_ID = 2
 
 @dataclass
 class SystemCallDone:

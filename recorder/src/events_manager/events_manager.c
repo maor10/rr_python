@@ -21,11 +21,12 @@ DECLARE_WAIT_QUEUE_HEAD(recorded_events_wait);
 ssize_t dump_single_event(char * __user addr, int max_size);
 
 
-void * create_event(unsigned char event_id, pid_t pid, unsigned int event_len) {
+event_data * create_event(unsigned char event_id, pid_t pid, unsigned int event_len) {
     struct recorded_event *new_event;
     
-    new_event = kmalloc(sizeof(struct recorded_event) + event_len, GFP_ATOMIC);
+    new_event = kmalloc(sizeof(struct recorded_event) + event_len, GFP_KERNEL);
 	IF_TRUE_CLEANUP(NULL == new_event, "Failed to malloc new event!");
+
     new_event->len = event_len + sizeof(struct recorded_event_dump);
     new_event->event_dump.pid = pid;
 	new_event->event_dump.event_id = event_id;
@@ -37,7 +38,7 @@ cleanup:
 
 }
 
-void destroy_event(void *event_data) {
+void destroy_event(event_data *event_data) {
     struct recorded_event_dump * recorded_event_dump =
             container_of(event_data, struct recorded_event_dump, event);
 
@@ -48,7 +49,7 @@ void destroy_event(void *event_data) {
     kfree(event);
 }
 
-int add_event(void *event_data) {
+int add_event(event_data *event_data) {
     struct recorded_event_dump * recorded_event_dump =
             container_of(event_data, struct recorded_event_dump, event);
 
@@ -102,7 +103,7 @@ ssize_t dump_single_event(char * __user addr, int max_size) {
 
     IF_TRUE_CLEANUP(0 != copy_to_user(addr, &(event->event_dump), event->len),
                         "Failed to copy to user!");
-    
+
     ret = event->len;
     goto cleanup;
 
@@ -161,7 +162,25 @@ cleanup:
     return -1;
 }
 
+void free_all_events(void) {
+    struct recorded_event *event = NULL;
+
+    mutex_lock(&recorded_events_mutex);
+
+    while (!kfifo_is_empty(&recorded_events)) {
+        IF_TRUE_CLEANUP(sizeof(event) != kfifo_out(&recorded_events, &(event), sizeof(event)), 
+                            "Failed to read from kfifo");
+
+        kfree(event);
+    }
+
+cleanup:
+    mutex_unlock(&recorded_events_mutex);
+    return;
+}
+
 void unload_events(void) {
     unload_events_dump_procfile();
+    free_all_events();
     kfifo_free(&recorded_events);
 }

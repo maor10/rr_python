@@ -14,13 +14,13 @@ struct copy_wrapper {
  * @NOTE : After decalring the wrapper you still need to add it to 
  *          wrappers array :)
  */
-#define DEFINE_WRAPPER(WRAPPER_NAME, SYSCALL_NAME, CALLBACK_FUNC)       \
+#define DEFINE_WRAPPER(WRAPPER_NAME, FUNC_TO_HOOK, CALLBACK_FUNC)       \
 struct copy_wrapper WRAPPER_NAME = {                                 \
     .get_record_mem_callback    = CALLBACK_FUNC,                        \
-    .retprobe.kp.symbol_name	= SYSCALL_NAME,                         \
+    .retprobe.kp.symbol_name	= FUNC_TO_HOOK,                         \
     .retprobe.entry_handler 	= pre_copy_wrapper,                     \
     .retprobe.handler		    = post_copy_wrapper,                    \
-    .retprobe.maxactive	    	= 1000,                                 \
+    .retprobe.maxactive	    	= 1,                                 \
     .retprobe.data_size	    	= sizeof(struct poll_recorded_mem *),   \
 }
 

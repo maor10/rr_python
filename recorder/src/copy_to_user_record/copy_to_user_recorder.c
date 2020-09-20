@@ -56,7 +56,7 @@ struct kretprobe copy_kretprobe = {
         .handler		= post_copy,
         // We need to save event to only add it if copy was success
         .data_size      = sizeof(struct recorded_event *),
-        .maxactive		= 1000
+        .maxactive		= 1
 };
 
 struct kretprobe copyout_kretprobe = {
@@ -65,14 +65,14 @@ struct kretprobe copyout_kretprobe = {
         .handler		= post_copy,
         // We need to save event to only add it if copy was success
         .data_size      = sizeof(struct recorded_event *),
-        .maxactive		= 1000
+        .maxactive		= 1
 };
 
 struct kretprobe put_user_1_kretprobes = {
         .kp.symbol_name	= "__put_user_1",
         .entry_handler 	= pre_put,
         .handler		= post_copy,
-        .maxactive		= 1000,
+        .maxactive		= 1,
         /* The data size of data we need to save +
          * Data size of put. This isn't used memory, but we use
          * this size in code to know which __put_user_* was called
@@ -84,7 +84,7 @@ struct kretprobe put_user_2_kretprobes = {
         .kp.symbol_name	= "__put_user_2",
         .entry_handler 	= pre_put,
         .handler		= post_copy,
-        .maxactive		= 1000,
+        .maxactive		= 1,
         /* The data size of data we need to save +
          * Data size of put. This isn't used memory, but we use
          * this size in code to know which __put_user_* was called
@@ -96,7 +96,7 @@ struct kretprobe put_user_4_kretprobes = {
         .kp.symbol_name	= "__put_user_4",
         .entry_handler 	= pre_put,
         .handler		= post_copy,
-        .maxactive		= 1000,
+        .maxactive		= 1,
         /* The data size of data we need to save +
          * Data size of put. This isn't used memory, but we use
          * this size in code to know which __put_user_* was called
@@ -108,7 +108,7 @@ struct kretprobe put_user_8_kretprobes = {
         .kp.symbol_name	= "__put_user_8",
         .entry_handler 	= pre_put,
         .handler		= post_copy,
-        .maxactive		= 1000,
+        .maxactive		= 1,
         /* The data size of data we need to save +
          * Data size of put. This isn't used memory, but we use
          * this size in code to know which __put_user_* was called
@@ -123,6 +123,7 @@ struct kretprobe * copy_kretprobes[] = {
 };
 
 
+/* A trick we use to choose the size of the copy we want to do */
 union put_data {
     uint8_t byte;
     uint16_t word;
@@ -137,6 +138,7 @@ int pre_put(struct kretprobe_instance * probe, struct pt_regs *regs) {
 
     IF_TRUE_CLEANUP(!is_pid_recorded(current->pid));
     
+    /* See kreprobe decleration for docs */
     copy_len = probe->rp->data_size - sizeof(struct recorded_event *);
 
     new_event = (struct copy_to_user_event *)create_event(EVENT_ID_COPY_TO_USER, current->pid, sizeof(struct copy_to_user_event) + copy_len);
@@ -167,10 +169,6 @@ int pre_put(struct kretprobe_instance * probe, struct pt_regs *regs) {
     return 0;
 
 cleanup:
-    if (NULL != new_event) {
-        destroy_event(new_event);
-    }
-
     return 1;
 }
 

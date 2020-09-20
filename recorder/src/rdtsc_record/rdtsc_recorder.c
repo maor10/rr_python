@@ -60,13 +60,13 @@ cleanup:
 	
 }
 
-void my_do_general_protection(struct pt_regs *regs, long error_code) {	
-	asm volatile("rdtsc" : "=a" (regs->ax), "=d" (regs->dx));
+void my_do_general_protection(struct pt_regs *userspace_regs, long error_code) {	
+	asm volatile("rdtsc" : "=a" (userspace_regs->ax), "=d" (userspace_regs->dx));
 
-	record_rdtsc(regs->ax, regs->dx);
+	record_rdtsc(userspace_regs->ax, userspace_regs->dx);
 
-	// Skip rdtsc
-	regs->ip += 2;
+	// Skip usersapce rdtsc opcode after we emulated it
+	userspace_regs->ip += 2;
 
 	return;
 }
@@ -78,12 +78,12 @@ void do_general_protection_switch(unsigned long ip, unsigned long parent_ip,
 	short opcode;
 
 	IF_TRUE_CLEANUP(!is_pid_recorded(current->pid));
-	
+
 	userspace_regs = (struct pt_regs *) regs->di;
 	IF_TRUE_CLEANUP(!user_mode(userspace_regs));
 	
 	IF_TRUE_CLEANUP(get_user(opcode, (short *)userspace_regs->ip), "Failed to get user opcode!");
-	IF_TRUE_CLEANUP(RDTSC_OPCODE != opcode, "Not opcode :(\n");
+	IF_TRUE_CLEANUP(RDTSC_OPCODE != opcode, "Not rdtsc opcode :(\n");
 
 	// Don't run original func -- run us :)
 	regs->ip = (unsigned long) my_do_general_protection;

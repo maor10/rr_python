@@ -4,6 +4,7 @@ from typing import List, Dict
 from replayer.system_consts import SYS_CALL_REGISTER, SYS_CALL_NAMES
 from .registers import Registers
 
+SYSTEM_CALL_ENTER_EVENT_ID = 1
 
 @dataclass
 class SystemCallEnter:

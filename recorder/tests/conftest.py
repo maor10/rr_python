@@ -6,6 +6,7 @@ import subprocess
 import ctypes
 from typing import List
 from replayer.loader import EventLoader
+from replayer.loader import SYSTEM_CALL_ENTER_EVENT_ID, SYSTEM_CALL_DONE_EVENT_ID, RDTSC_EVENT_ID, COPY_TO_USER_EVENT_ID
 
 KERNEL_MODULE = "record.ko"
 KERNEL_MODULE_PATH = f"../src/{KERNEL_MODULE}"
@@ -30,7 +31,14 @@ def get_recorded_events():
         
         # First syscall is close of /proc/record_command, 
         # And last 2 are open and write to that file. Don't return them!
-        return EventLoader.from_buffer(content).load_many()[2:-3]
+        events = EventLoader.from_buffer(content).load_many()[2:]
+
+        # If process hasn't exited, the last 4 events will be the write to /proc/record_command file
+        if len(events) > 2 and events[-2].event_type == SYSTEM_CALL_ENTER_EVENT_ID \
+                            and events[-2].event_data.name == "write":
+            events = events[:-4]
+        
+        return events
         
     return get
         
@@ -91,6 +99,6 @@ def syscall_caller():
 @pytest.fixture
 def get_copies_from_events():
     def _get_copies_from_events(events):
-        return [event.event_data for event in events if event.event_type == 3]
+        return [event.event_data for event in events if event.event_type == COPY_TO_USER_EVENT_ID]
     
     return _get_copies_from_events
